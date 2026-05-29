@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REIS FLOW — Gestão Operacional</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+
+<div class="page active fade-in" id="page-login">
+  <div class="login-bg"></div>
+  <div class="login-grid"></div>
+  <div class="login-container">
+    <div class="login-brand">
+      <div class="logo-wrap">
+        <svg width="42" height="42" viewBox="0 0 44 44" fill="none">
+          <rect width="44" height="44" rx="12" fill="#1B4F6B"/>
+          <rect x="0.5" y="0.5" width="43" height="43" rx="11.5" stroke="rgba(255,255,255,0.15)"/>
+          <circle cx="11" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+          <circle cx="22" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+          <circle cx="33" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+          <circle cx="11" cy="22" r="3.5" fill="#3AACDF"/>
+          <circle cx="33" cy="22" r="3.5" fill="#3AACDF"/>
+          <path d="M11 22 C11 16,22 16,22 22 C22 28,33 28,33 22" stroke="#3AACDF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span style="font-size:24px;font-weight:800;letter-spacing:-0.02em">REIS <span style="color:#3AACDF">FLOW</span></span>
+      </div>
+      <h1>Gestão operacional<br>que <span>gera resultado</span></h1>
+      <p>Controle obras, equipes, financeiro e clientes em uma plataforma moderna, inteligente e preparada para crescer com seu negócio.</p>
+      <div class="feature-list">
+        <div class="feature-item"><i class="ti ti-check"></i>Gestão completa de obras e OS</div>
+        <div class="feature-item"><i class="ti ti-check"></i>Orçamentos automáticos em minutos</div>
+        <div class="feature-item"><i class="ti ti-check"></i>Controle financeiro em tempo real</div>
+        <div class="feature-item"><i class="ti ti-check"></i>Equipes e estoque integrados</div>
+        <div class="feature-item"><i class="ti ti-check"></i>Pronto para mobile e expansão</div>
+      </div>
+    </div>
+
+    <div class="login-card">
+      <div class="login-tabs">
+        <button class="login-tab active" onclick="switchLoginTab('login',this)">Entrar</button>
+        <button class="login-tab" onclick="switchLoginTab('register',this)">Cadastrar</button>
+        <button class="login-tab" onclick="switchLoginTab('recover',this)">Recuperar</button>
+      </div>
+
+      <div id="login-form">
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <div class="form-input-icon">
+            <i class="ti ti-mail"></i>
+            <input class="form-input" type="email" placeholder="admin@reisflow.com.br" value="admin@reisflow.com.br">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <div class="form-input-icon">
+            <i class="ti ti-lock"></i>
+            <input class="form-input" type="password" placeholder="••••••••" value="••••••••">
+          </div>
+        </div>
+        <div class="login-forgot"><a onclick="switchLoginTab('recover',null)">Esqueceu a senha?</a></div>
+        <button class="btn-login" onclick="goToApp()">
+          <i class="ti ti-arrow-right" style="margin-right:6px"></i>Acessar o sistema
+        </button>
+        <div class="login-divider">ou continue com</div>
+        <div style="display:flex;gap:8px">
+          <button style="flex:1;padding:9px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:7px;color:var(--text-muted);font-size:12px;cursor:pointer;transition:var(--transition)" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+            <i class="ti ti-brand-google" style="margin-right:5px"></i>Google
+          </button>
+          <button style="flex:1;padding:9px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:7px;color:var(--text-muted);font-size:12px;cursor:pointer;transition:var(--transition)" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+            <i class="ti ti-brand-microsoft" style="margin-right:5px"></i>Microsoft
+          </button>
+        </div>
+        <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:20px">Credenciais demo: admin@reisflow.com.br</p>
+        <p style="text-align:center;margin-top:10px">
+          <a href="https://example.com" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--petrol-light)">
+            Abrir link de teste
+          </a>
+        </p>
+      </div>
+
+      <div id="register-form" style="display:none">
+        <div class="form-group"><label class="form-label">Nome completo</label><div class="form-input-icon"><i class="ti ti-user"></i><input class="form-input" type="text" placeholder="Carlos Eduardo Reis"></div></div>
+        <div class="form-group"><label class="form-label">E-mail empresarial</label><div class="form-input-icon"><i class="ti ti-mail"></i><input class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
+        <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input class="form-input" type="text" placeholder="Reis Obras e Serviços Ltda"></div></div>
+        <div class="form-group"><label class="form-label">Telefone</label><div class="form-input-icon"><i class="ti ti-phone"></i><input class="form-input" type="tel" placeholder="(11) 99999-0000"></div></div>
+        <div class="form-group"><label class="form-label">Senha</label><div class="form-input-icon"><i class="ti ti-lock"></i><input class="form-input" type="password" placeholder="Mínimo 8 caracteres"></div></div>
+        <button class="btn-login" onclick="showToast('Conta criada! Redirecionando...','success');setTimeout(goToApp,1500)">Criar conta grátis</button>
+      </div>
+
+      <div id="recover-form" style="display:none">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.6">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
+        <div class="form-group"><label class="form-label">E-mail cadastrado</label><div class="form-input-icon"><i class="ti ti-mail"></i><input class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
+        <button class="btn-login" onclick="showToast('Link enviado para seu e-mail!','success')">Enviar link de recuperação</button>
+        <p style="text-align:center;margin-top:16px"><button onclick="switchLoginTab('login',null)" style="background:none;border:none;color:var(--petrol-light);font-size:13px;cursor:pointer">← Voltar ao login</button></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <svg width="26" height="26" viewBox="0 0 44 44" fill="none">
+          <rect width="44" height="44" rx="12" fill="#1B4F6B"/>
+          <circle cx="11" cy="22" r="3.5" fill="#3AACDF"/>
+          <circle cx="33" cy="22" r="3.5" fill="#3AACDF"/>
+          <path d="M11 22 C11 16,22 16,22 22 C22 28,33 28,33 22" stroke="#3AACDF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        </svg>
+        <span class="wordmark">REIS <span>FLOW</span></span>
+      </div>
+      <button class="sidebar-toggle" onclick="toggleSidebar()" id="sb-toggle">
+        <i class="ti ti-layout-sidebar-left-collapse" id="sb-icon"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <div class="nav-item active" onclick="navigate('dashboard',this)"><i class="ti ti-layout-dashboard"></i><span class="label">Dashboard</span></div>
+      <div class="nav-item" onclick="navigate('obras',this)"><i class="ti ti-building-factory-2"></i><span class="label">Obras</span><span class="nav-badge">3</span></div>
+      <div class="nav-item" onclick="navigate('orcamentos',this)"><i class="ti ti-file-dollar"></i><span class="label">Orçamentos</span></div>
+      <div class="nav-item" onclick="navigate('clientes',this)"><i class="ti ti-users"></i><span class="label">Clientes</span></div>
+      <div class="nav-section-label">Operacional</div>
+      <div class="nav-item" onclick="navigate('financeiro',this)"><i class="ti ti-cash"></i><span class="label">Financeiro</span></div>
+      <div class="nav-item" onclick="navigate('equipes',this)"><i class="ti ti-hard-hat"></i><span class="label">Equipes</span></div>
+      <div class="nav-item" onclick="navigate('estoque',this)"><i class="ti ti-packages"></i><span class="label">Estoque</span></div>
+      <div class="nav-section-label">Sistema</div>
+      <div class="nav-item" onclick="navigate('configuracoes',this)"><i class="ti ti-settings"></i><span class="label">Configurações</span></div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="avatar" style="font-size:12px">CE</div>
+        <div class="user-info">
+          <div class="user-name">Carlos Eduardo</div>
+          <div class="user-role">Administrador</div>
+        </div>
+        <i class="ti ti-dots-vertical" style="color:var(--text-muted);font-size:15px;margin-left:auto;flex-shrink:0"></i>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="breadcrumb" id="topbar-breadcrumb">
+        <span>REIS FLOW</span><span class="sep">/</span><span class="cur">Dashboard</span>
+      </div>
+      <div class="topbar-search">
+        <i class="ti ti-search"></i>
+        <input type="text" placeholder="Buscar obras, clientes, OS...">
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" onclick="showToast('Nenhuma atualização disponível','info')"><i class="ti ti-refresh"></i></button>
+        <button class="icon-btn" onclick="showNotifPanel()">
+          <i class="ti ti-bell"></i>
+          <span class="notif-dot"></span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="openQuickCreate()"><i class="ti ti-plus"></i>Nova OS</button>
+        <button class="icon-btn" onclick="goToLogin()" title="Sair"><i class="ti ti-logout"></i></button>
+      </div>
+    </div>
+
+    <div class="content-area">
+      <div class="view fade-in" id="view-dashboard">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Visão Geral</h2>
+            <p>Resumo operacional — Junho 2025</p>
+          </div>
+          <div class="page-header-right">
+            <select class="filter-select" style="font-size:12px">
+              <option>Junho 2025</option><option>Maio 2025</option><option>Abril 2025</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="alert alert-warning" style="margin-bottom:16px">
+          <i class="ti ti-alert-triangle"></i>
+          <div><div class="alert-title">3 obras com prazo vencendo esta semana</div><div class="alert-desc">OS #2843, #2851, #2860 — revise os prazos e notifique as equipes</div></div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
+            <div class="stat-label">Obras Ativas</div>
+            <div class="stat-value" style="color:var(--petrol-light)">18</div>
+            <div class="stat-sub"><span class="up">↑ 3</span> este mês</div>
+            <i class="ti ti-building-factory-2 stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--red)" onclick="navigate('obras',null)">
+            <div class="stat-label">Obras Atrasadas</div>
+            <div class="stat-value" style="color:var(--red)">4</div>
+            <div class="stat-sub"><span class="down">↑ 1</span> desde ontem</div>
+            <i class="ti ti-alert-circle stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--green)">
+            <div class="stat-label">Faturamento Mensal</div>
+            <div class="stat-value" style="color:var(--green)">R$287k</div>
+            <div class="stat-sub"><span class="up">↑ 18%</span> vs mês anterior</div>
+            <i class="ti ti-cash stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:#A76EF6">
+            <div class="stat-label">Lucro Previsto</div>
+            <div class="stat-value" style="color:#A76EF6">R$94k</div>
+            <div class="stat-sub"><span class="up">32.7%</span> margem</div>
+            <i class="ti ti-trending-up stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
+            <div class="stat-label">Orç. Pendentes</div>
+            <div class="stat-value" style="color:var(--orange)">9</div>
+            <div class="stat-sub">R$ 412k em aberto</div>
+            <i class="ti ti-file-dollar stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
+            <div class="stat-label">Equipes em Campo</div>
+            <div class="stat-value" style="color:var(--petrol-light)">7</div>
+            <div class="stat-sub">24 técnicos ativos</div>
+            <i class="ti ti-hard-hat stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
+            <div class="stat-label">Contas Vencendo</div>
+            <div class="stat-value" style="color:var(--red)">R$43k</div>
+            <div class="stat-sub">Próximos 7 dias</div>
+            <i class="ti ti-calendar-due stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
+            <div class="stat-label">A Receber</div>
+            <div class="stat-value" style="color:var(--green)">R$168k</div>
+            <div class="stat-sub">12 parcelas em aberto</div>
+            <i class="ti ti-receipt stat-icon"></i>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="card">
+            <div class="section-hdr"><h3>Faturamento Mensal</h3><span style="font-size:11px;color:var(--text-muted)">Jan–Jun 2025</span></div>
+            <div style="height:160px;display:flex;align-items:flex-end;gap:5px;padding-top:10px" id="chart-fat"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--text-muted)" id="chart-labels"></div>
+          </div>
+          <div class="card">
+            <div class="section-hdr"><h3>Status das Obras</h3></div>
+            <div style="display:flex;flex-direction:column;gap:10px;padding-top:8px">
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Em andamento</span><span style="color:var(--petrol-light)">56%</span></div>
+                <div class="progress"><div class="progress-fill" style="width:56%;background:var(--petrol-light)"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Orçamento</span><span style="color:var(--orange)">22%</span></div>
+                <div class="progress"><div class="progress-fill" style="width:22%;background:var(--orange)"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Finalizadas</span><span style="color:var(--green)">14%</span></div>
+                <div class="progress"><div class="progress-fill" style="width:14%;background:var(--green)"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Atrasadas</span><span style="color:var(--red)">8%</span></div>
+                <div class="progress"><div class="progress-fill" style="width:8%;background:var(--red)"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="card">
+            <div class="section-hdr"><h3>Últimas Obras</h3><button onclick="navigate('obras',null)">Ver todas →</button></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div onclick="openObraDetail('OB-0031')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#1B4F6B,#2176A3)">CH</div>
+                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reforma Comercial Horizonte</div><div style="font-size:11px;color:var(--text-muted)">OB-0031 · Prazo: 28/06</div></div>
+                <span class="badge badge-info"><span class="badge-dot"></span>Andamento</span>
+              </div>
+              <div onclick="openObraDetail('OB-0030')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#4A1B8F,#7B3FC4)">GI</div>
+                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Instalação Elétrica Inova</div><div style="font-size:11px;color:var(--text-muted)">OB-0030 · Prazo: 15/06</div></div>
+                <span class="badge badge-danger"><span class="badge-dot"></span>Atrasada</span>
+              </div>
+              <div onclick="openObraDetail('OB-0029')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">TF</div>
+                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Manutenção Preventiva TechFix</div><div style="font-size:11px;color:var(--text-muted)">OB-0029 · Prazo: 30/06</div></div>
+                <span class="badge badge-success"><span class="badge-dot"></span>Concluída</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-hdr"><h3>Tarefas Pendentes</h3><button>Ver todas →</button></div>
+            <div class="checklist" id="dash-tasks">
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Enviar orçamento — Construtora ABC</span></div>
+              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Aprovar NF #3847 — R$ 12.400</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Agendar visita técnica — cliente novo</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Pagar fornecedor Hidrobom — vence hoje</span></div>
+              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Atualizar status OB-0031</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-hdr"><h3>Clientes Recentes</h3><button onclick="navigate('clientes',null)">Ver todos →</button></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cliente</th><th>Tipo</th><th>Obras</th><th>Total</th><th>Último Contato</th></tr></thead>
+              <tbody>
+                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar">CH</div><div><div class="bold">Construtora Horizonte</div><div style="font-size:11px;color:var(--text-muted)">(11) 3847-2000</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">8 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 892k</span></td><td class="muted">Hoje</td></tr>
+                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:linear-gradient(135deg,#4A1B8F,#7B3FC4)">GI</div><div><div class="bold">Grupo Inova Obras</div><div style="font-size:11px;color:var(--text-muted)">(11) 9847-3020</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">5 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 456k</span></td><td class="muted">Ontem</td></tr>
+                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">TF</div><div><div class="bold">TechFix Soluções</div><div style="font-size:11px;color:var(--text-muted)">(11) 9234-5678</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">3 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 187k</span></td><td class="muted">3 dias</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-obras" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Gestão de Obras</h2>
+            <p>18 obras ativas · 4 atrasadas</p>
+          </div>
+          <div class="page-header-right">
+            <div class="tabs" style="margin:0">
+              <button class="tab-item active" onclick="setObrasView('list',this)"><i class="ti ti-list" style="font-size:13px"></i> Lista</button>
+              <button class="tab-item" onclick="setObrasView('kanban',this)"><i class="ti ti-layout-kanban" style="font-size:13px"></i> Kanban</button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-nova-obra')"><i class="ti ti-plus"></i>Nova Obra</button>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar por obra, cliente, código..."></div>
+          <select class="filter-select"><option>Todos os status</option><option>Em andamento</option><option>Orçamento</option><option>Atrasada</option><option>Finalizada</option></select>
+          <select class="filter-select"><option>Todos os responsáveis</option><option>Diego Santos</option><option>Ana Moura</option><option>Pedro Lima</option></select>
+          <select class="filter-select"><option>Prioridade</option><option>Alta</option><option>Média</option><option>Baixa</option></select>
+        </div>
+
+        <div id="obras-list">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Código</th><th>Obra</th><th>Cliente</th><th>Responsável</th><th>Prazo</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody id="obras-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="obras-kanban" style="display:none" class="kanban-wrap"></div>
+      </div>
+
+      <div class="view fade-in" id="view-obra-detail" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <button class="btn btn-ghost btn-sm" onclick="navigate('obras',null)"><i class="ti ti-arrow-left"></i>Obras</button>
+          <span style="color:var(--text-dim)">/</span>
+          <span id="obra-detail-breadcrumb" style="font-size:13px;color:var(--text-muted)">OB-0031</span>
+        </div>
+
+        <div class="detail-header">
+          <span class="detail-code" id="obra-detail-code">OB-0031</span>
+          <div style="flex:1">
+            <div class="detail-name" id="obra-detail-name">Reforma Comercial Horizonte</div>
+            <div style="font-size:13px;color:var(--text-muted)" id="obra-detail-client">Construtora Horizonte · São Paulo, SP</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="badge badge-info" id="obra-detail-status"><span class="badge-dot"></span>Em andamento</span>
+            <button class="btn btn-secondary btn-sm"><i class="ti ti-edit"></i>Editar</button>
+            <button class="btn btn-secondary btn-sm"><i class="ti ti-file-export"></i>Relatório</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="info-grid">
+            <div class="info-item"><div class="lbl">Responsável</div><div class="val" id="obra-detail-resp">Diego Santos</div></div>
+            <div class="info-item"><div class="lbl">Data de Início</div><div class="val">03/03/2025</div></div>
+            <div class="info-item"><div class="lbl">Prazo</div><div class="val red" id="obra-detail-prazo">28/06/2025 ⚠</div></div>
+            <div class="info-item"><div class="lbl">Prioridade</div><div class="val"><span class="badge badge-danger">Alta</span></div></div>
+            <div class="info-item"><div class="lbl">Valor Vendido</div><div class="val blue" id="obra-detail-valor">R$ 148.000</div></div>
+            <div class="info-item"><div class="lbl">Custo Previsto</div><div class="val">R$ 98.000</div></div>
+            <div class="info-item"><div class="lbl">Lucro Previsto</div><div class="val green">R$ 50.000</div></div>
+            <div class="info-item"><div class="lbl">Margem</div><div class="val green">33,8%</div></div>
+          </div>
+          <div style="margin-top:10px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Progresso geral</span><span style="color:var(--petrol-light);font-weight:600">62%</span></div>
+            <div class="progress" style="height:6px"><div class="progress-fill" style="width:62%;background:var(--petrol-light)"></div></div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:16px">
+          <div class="card">
+            <div class="section-hdr"><h3><i class="ti ti-list-check" style="font-size:14px;color:var(--petrol-light)"></i> Etapas da Obra</h3><button onclick="showToast('Etapa adicionada','success')"><i class="ti ti-plus"></i> Adicionar</button></div>
+            <div class="checklist">
+              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Levantamento e vistoria</span></div>
+              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Projeto aprovado pelo cliente</span></div>
+              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Demolição área interna</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Elétrica — fase 1 (70% concluído)</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Hidráulica e instalações</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Acabamento e pintura</span></div>
+              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Vistoria final e entrega</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="section-hdr"><h3><i class="ti ti-timeline" style="font-size:14px;color:var(--petrol-light)"></i> Histórico</h3></div>
+            <div class="timeline">
+              <div class="timeline-item">
+                <div class="tl-dot" style="background:var(--blue-bg);color:var(--petrol-light)"><i class="ti ti-camera" style="font-size:12px"></i></div>
+                <div class="tl-line"></div>
+                <div class="tl-content"><div class="tl-title">Fotos enviadas — fase elétrica</div><div class="tl-desc">Diego Santos enviou 8 fotos do progresso</div><div class="tl-date">Hoje, 14:22</div></div>
+              </div>
+              <div class="timeline-item">
+                <div class="tl-dot" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-check" style="font-size:12px"></i></div>
+                <div class="tl-line"></div>
+                <div class="tl-content"><div class="tl-title">Etapa demolição concluída</div><div class="tl-desc">Marcada como finalizada por Diego Santos</div><div class="tl-date">12/06, 09:10</div></div>
+              </div>
+              <div class="timeline-item">
+                <div class="tl-dot" style="background:var(--orange-bg);color:var(--orange)"><i class="ti ti-alert-triangle" style="font-size:12px"></i></div>
+                <div class="tl-line"></div>
+                <div class="tl-content"><div class="tl-title">Alerta de prazo</div><div class="tl-desc">Obra 16 dias do vencimento</div><div class="tl-date">10/06, 08:00</div></div>
+              </div>
+              <div class="timeline-item">
+                <div class="tl-dot" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-currency-dollar" style="font-size:12px"></i></div>
+                <div class="tl-line"></div>
+                <div class="tl-content"><div class="tl-title">Parcela recebida — R$ 44.400</div><div class="tl-desc">30% do contrato — pago pelo cliente</div><div class="tl-date">03/06, 16:45</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-hdr"><h3><i class="ti ti-photo" style="font-size:14px;color:var(--petrol-light)"></i> Galeria de Fotos</h3><button onclick="showToast('Abrir câmera / upload','info')"><i class="ti ti-upload"></i> Adicionar</button></div>
+          <div class="photo-grid">
+            <div class="photo-item" style="background:linear-gradient(135deg,rgba(27,79,107,0.4),rgba(33,118,163,0.2))"><i class="ti ti-building-community" style="font-size:28px;color:var(--petrol-light)"></i></div>
+            <div class="photo-item" style="background:linear-gradient(135deg,rgba(45,212,160,0.1),rgba(27,79,107,0.3))"><i class="ti ti-bolt" style="font-size:28px;color:var(--green)"></i></div>
+            <div class="photo-item" style="background:linear-gradient(135deg,rgba(245,149,51,0.1),rgba(33,37,47,0.5))"><i class="ti ti-tools" style="font-size:28px;color:var(--orange)"></i></div>
+            <div class="photo-item add" onclick="showToast('Upload de foto','info')"><i class="ti ti-plus"></i></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-hdr"><h3><i class="ti ti-cash" style="font-size:14px;color:var(--petrol-light)"></i> Financeiro da Obra</h3></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Parcela</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">#1</td><td>Sinal (30%)</td><td class="bold" style="color:var(--green)">R$ 44.400</td><td class="muted">03/03/2025</td><td><span class="badge badge-success">Pago</span></td></tr>
+                <tr><td class="mono">#2</td><td>Medição 1 (40%)</td><td class="bold" style="color:var(--orange)">R$ 59.200</td><td class="muted">10/06/2025</td><td><span class="badge badge-warning">Pendente</span></td></tr>
+                <tr><td class="mono">#3</td><td>Entrega final (30%)</td><td class="bold" style="color:var(--text-muted)">R$ 44.400</td><td class="muted">28/06/2025</td><td><span class="badge badge-neutral">Futuro</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-orcamentos" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Orçamentos</h2>
+            <p>9 pendentes · R$ 412k em propostas abertas</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-secondary btn-sm"><i class="ti ti-database"></i>Banco de Serviços</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-novo-orc')"><i class="ti ti-plus"></i>Novo Orçamento</button>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar orçamento..."></div>
+          <select class="filter-select"><option>Todos</option><option>Pendente</option><option>Aprovado</option><option>Reprovado</option><option>Expirado</option></select>
+        </div>
+
+        <div class="table-wrap" style="margin-bottom:20px">
+          <table>
+            <thead><tr><th>Código</th><th>Cliente</th><th>Descrição</th><th>Valor Total</th><th>Margem</th><th>Validade</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="orc-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="section-hdr"><h3><i class="ti ti-file-invoice" style="font-size:14px;color:var(--petrol-light)"></i> Preview — ORC-2847 · Reforma Elétrica Completa</h3>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-secondary btn-sm" onclick="showToast('PDF gerado com sucesso!','success')"><i class="ti ti-file-type-pdf"></i>PDF</button>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Orçamento enviado ao cliente!','success')"><i class="ti ti-send"></i>Enviar</button>
+            </div>
+          </div>
+
+          <div style="background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+              <div>
+                <div style="font-size:18px;font-weight:800;letter-spacing:-0.02em;margin-bottom:2px">ORÇAMENTO</div>
+                <div style="font-family:var(--mono);font-size:12px;color:var(--petrol-light)">#ORC-2847</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:13px;font-weight:700">REIS FLOW Serviços</div>
+                <div style="font-size:11px;color:var(--text-muted)">CNPJ: 12.345.678/0001-00</div>
+                <div style="font-size:11px;color:var(--text-muted)">Validade: 15/07/2025</div>
+              </div>
+            </div>
+            <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;font-size:13px">
+              <span style="color:var(--text-muted)">Cliente: </span><span style="font-weight:600">Construtora Horizonte Ltda</span>
+              <span style="margin-left:20px;color:var(--text-muted)">Obra: </span><span style="font-weight:600">Reforma Comercial Sede SP</span>
+            </div>
+
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);display:grid;grid-template-columns:1fr 80px 100px 90px;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px">
+              <span>Descrição</span><span>Qtd</span><span>Unitário</span><span style="text-align:right">Total</span>
+            </div>
+
+            <div style="font-size:13px;display:flex;flex-direction:column;gap:6px" id="orc-preview-items"></div>
+
+            <div class="budget-total-row">
+              <div class="total-item"><div class="tl">Subtotal</div><div class="tv">R$ 89.200</div></div>
+              <div class="total-item"><div class="tl">Desconto</div><div class="tv" style="color:var(--red)">-R$ 2.000</div></div>
+              <div class="total-item"><div class="tl">Lucro (32%)</div><div class="tv tv-green">R$ 28.000</div></div>
+              <div class="total-item"><div class="tl">TOTAL</div><div class="tv tv-blue" style="font-size:20px">R$ 87.200</div></div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);padding:0 4px">
+            <span><i class="ti ti-calendar" style="margin-right:3px"></i>Validade: 30 dias</span>
+            <span><i class="ti ti-credit-card" style="margin-right:3px"></i>Condições: 30/60/90 dias</span>
+            <span><i class="ti ti-map-pin" style="margin-right:3px"></i>Deslocamento incluído</span>
+            <span><i class="ti ti-signature" style="margin-right:3px;color:var(--petrol-light)"></i>Assinatura digital disponível</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-clientes" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Clientes</h2>
+            <p>47 clientes cadastrados · 18 ativos</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-novo-cliente')"><i class="ti ti-plus"></i>Novo Cliente</button>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Nome, CNPJ, e-mail..."></div>
+          <select class="filter-select"><option>Todos</option><option>CNPJ</option><option>CPF</option></select>
+          <select class="filter-select"><option>Todos os status</option><option>Ativo</option><option>Inativo</option></select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cliente</th><th>Documento</th><th>Telefone</th><th>Obras</th><th>Total Faturado</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="cli-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-financeiro" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Financeiro</h2>
+            <p>Controle de caixa, recebíveis e contas a pagar</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-secondary btn-sm" onclick="showToast('Exportando relatório...','success')"><i class="ti ti-download"></i>Exportar</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-lancamento')"><i class="ti ti-plus"></i>Lançamento</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card" style="--accent:var(--green)">
+            <div class="stat-label">Total a Receber</div>
+            <div class="stat-value" style="color:var(--green)">R$168k</div>
+            <div class="stat-sub">12 parcelas em aberto</div>
+            <i class="ti ti-arrow-down-circle stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--red)">
+            <div class="stat-label">Total a Pagar</div>
+            <div class="stat-value" style="color:var(--red)">R$87k</div>
+            <div class="stat-sub"><span class="down">R$43k</span> vence em 7 dias</div>
+            <i class="ti ti-arrow-up-circle stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--petrol-light)">
+            <div class="stat-label">Saldo Previsto</div>
+            <div class="stat-value" style="color:var(--petrol-light)">R$81k</div>
+            <div class="stat-sub">Mês de junho</div>
+            <i class="ti ti-wallet stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:#A76EF6">
+            <div class="stat-label">Faturado no Mês</div>
+            <div class="stat-value" style="color:#A76EF6">R$287k</div>
+            <div class="stat-sub"><span class="up">↑ 18%</span> vs maio</div>
+            <i class="ti ti-chart-bar stat-icon"></i>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-item active" onclick="setFinTab('receber',this)">A Receber</button>
+          <button class="tab-item" onclick="setFinTab('pagar',this)">A Pagar</button>
+          <button class="tab-item" onclick="setFinTab('fluxo',this)">Fluxo de Caixa</button>
+        </div>
+
+        <div id="fin-receber">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Ref.</th><th>Cliente / Obra</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody id="fin-rec-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="fin-pagar" style="display:none">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Ref.</th><th>Fornecedor</th><th>Categoria</th><th>Valor</th><th>Vencimento</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody id="fin-pag-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="fin-fluxo" style="display:none">
+          <div class="card">
+            <div class="section-hdr"><h3>Fluxo de Caixa — Junho 2025</h3></div>
+            <div style="height:200px;position:relative;margin:10px 0" id="fluxo-chart-wrap">
+              <svg viewBox="0 0 660 180" width="100%" height="100%" id="fluxo-svg"></svg>
+            </div>
+            <div style="display:flex;gap:20px;font-size:12px;justify-content:center">
+              <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--green);display:inline-block;border-radius:2px"></span>Entradas</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--red);display:inline-block;border-radius:2px"></span>Saídas</span>
+              <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:3px;background:var(--petrol-light);display:inline-block;border-radius:2px;border-top:2px dashed var(--petrol-light)"></span>Saldo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-equipes" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Equipes</h2>
+            <p>24 profissionais · 7 equipes ativas</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-novo-membro')"><i class="ti ti-plus"></i>Novo Membro</button>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar por nome, função..."></div>
+          <select class="filter-select"><option>Todas as funções</option><option>Eletricista</option><option>Encanador</option><option>Pedreiro</option><option>Mestre de Obras</option></select>
+          <select class="filter-select"><option>Todos os status</option><option>Em campo</option><option>Disponível</option><option>Afastado</option></select>
+        </div>
+
+        <div id="equipes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>
+      </div>
+
+      <div class="view fade-in" id="view-estoque" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Estoque</h2>
+            <p>142 itens · 8 abaixo do mínimo</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-secondary btn-sm" onclick="showToast('Relatório de estoque gerado','success')"><i class="ti ti-file-export"></i>Relatório</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-nova-entrada')"><i class="ti ti-plus"></i>Entrada</button>
+          </div>
+        </div>
+
+        <div class="alert alert-warning" style="margin-bottom:16px">
+          <i class="ti ti-alert-triangle"></i>
+          <div><div class="alert-title">8 itens abaixo do estoque mínimo</div><div class="alert-desc">Revise e faça novos pedidos aos fornecedores</div></div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar material..."></div>
+          <select class="filter-select"><option>Todas as categorias</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option></select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>Estoque</th><th>Mínimo</th><th>Nível</th><th>Custo Unit.</th><th>Fornecedor</th><th>Ações</th></tr></thead>
+            <tbody id="estoque-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-configuracoes" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Configurações</h2>
+            <p>Empresa, sistema e integrações</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="section-hdr"><h3><i class="ti ti-building" style="font-size:14px;color:var(--petrol-light)"></i> Dados da Empresa</h3></div>
+              <div class="field"><label>Razão Social</label><input value="Reis Obras e Serviços Ltda" type="text"></div>
+              <div class="field"><label>CNPJ</label><input value="12.345.678/0001-00" type="text"></div>
+              <div class="field"><label>E-mail</label><input value="contato@reisflow.com.br" type="text"></div>
+              <div class="field"><label>Telefone</label><input value="(11) 3847-2000" type="text"></div>
+              <div class="field"><label>Endereço</label><input value="Av. Paulista, 1000 — São Paulo, SP" type="text"></div>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Dados salvos com sucesso!','success')"><i class="ti ti-check"></i>Salvar alterações</button>
+            </div>
+
+            <div class="card">
+              <div class="section-hdr"><h3><i class="ti ti-users" style="font-size:14px;color:var(--petrol-light)"></i> Usuários e Permissões</h3><button class="btn btn-sm btn-secondary" onclick="openModal('modal-novo-membro')"><i class="ti ti-plus"></i>Convidar</button></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:1px solid var(--border)">
+                  <div class="avatar-sm avatar">CE</div>
+                  <div style="flex:1"><div style="font-size:13px;font-weight:600">Carlos Eduardo</div><div style="font-size:11px;color:var(--text-muted)">admin@reisflow.com.br</div></div>
+                  <span class="badge badge-info">Admin</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:1px solid var(--border)">
+                  <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">DS</div>
+                  <div style="flex:1"><div style="font-size:13px;font-weight:600">Diego Santos</div><div style="font-size:11px;color:var(--text-muted)">diego@reisflow.com.br</div></div>
+                  <span class="badge badge-neutral">Técnico</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="section-hdr"><h3><i class="ti ti-puzzle" style="font-size:14px;color:var(--petrol-light)"></i> Integrações</h3></div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-brand-whatsapp" style="font-size:20px;color:#25D366"></i><div><div style="font-size:13px;font-weight:600">WhatsApp Business</div><div style="font-size:11px;color:var(--text-muted)">Envio automático de alertas</div></div></div>
+                  <button class="btn btn-primary btn-xs" onclick="showToast('Conectando WhatsApp...','info')">Conectar</button>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-file-type-pdf" style="font-size:20px;color:var(--red)"></i><div><div style="font-size:13px;font-weight:600">Gerador de PDF</div><div style="font-size:11px;color:var(--text-muted)">Orçamentos e relatórios</div></div></div>
+                  <span class="badge badge-success">Ativo</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-robot" style="font-size:20px;color:var(--petrol-light)"></i><div><div style="font-size:13px;font-weight:600">Assistente IA</div><div style="font-size:11px;color:var(--text-muted)">Automações inteligentes</div></div></div>
+                  <button class="btn btn-secondary btn-xs">Em breve</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="section-hdr"><h3><i class="ti ti-palette" style="font-size:14px;color:var(--petrol-light)"></i> Aparência</h3></div>
+              <div class="field"><label>Tema</label><select><option>Dark (padrão)</option><option>Light</option><option>Sistema</option></select></div>
+              <div class="field"><label>Idioma</label><select><option>Português (BR)</option><option>Inglês</option></select></div>
+              <div class="field"><label>Fuso horário</label><select><option>Brasília (UTC-3)</option></select></div>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Preferências salvas!','success')"><i class="ti ti-check"></i>Salvar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modal-nova-obra">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-building-factory-2" style="margin-right:8px;color:var(--petrol-light)"></i>Nova Obra</div>
+      <button class="modal-close" onclick="closeModal('modal-nova-obra')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row"><div class="field"><label>Código (auto)</label><input value="OB-0032" disabled style="opacity:0.5"></div><div class="field"><label>Título da Obra</label><input placeholder="Ex: Reforma elétrica completa"></div></div>
+    <div class="field-row"><div class="field"><label>Cliente</label><select><option>Construtora Horizonte</option><option>Grupo Inova</option><option>TechFix Soluções</option><option>+ Novo cliente</option></select></div><div class="field"><label>Responsável</label><select><option>Diego Santos</option><option>Ana Moura</option><option>Pedro Lima</option></select></div></div>
+    <div class="field"><label>Endereço da obra</label><input placeholder="Rua, número, bairro, cidade"></div>
+    <div class="field-row"><div class="field"><label>Data de início</label><input type="date"></div><div class="field"><label>Prazo de entrega</label><input type="date"></div></div>
+    <div class="field-row"><div class="field"><label>Prioridade</label><select><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div><div class="field"><label>Valor da proposta</label><input placeholder="R$ 0,00" type="text"></div></div>
+    <div class="field"><label>Observações</label><textarea placeholder="Descrição do escopo, condições especiais..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-nova-obra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-nova-obra');showToast('Obra OB-0032 criada!','success')"><i class="ti ti-check"></i>Criar Obra</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-novo-orc">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-file-dollar" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Orçamento</div>
+      <button class="modal-close" onclick="closeModal('modal-novo-orc')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row"><div class="field"><label>Cliente</label><select><option>Construtora Horizonte</option><option>Grupo Inova</option><option>TechFix</option></select></div><div class="field"><label>Validade</label><input type="date"></div></div>
+    <div class="field"><label>Descrição do Serviço</label><input placeholder="Ex: Reforma elétrica completa — galpão industrial"></div>
+
+    <div style="margin:16px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600">Itens do Orçamento</span>
+        <button class="btn btn-secondary btn-xs" onclick="addOrcLine()"><i class="ti ti-plus"></i>Adicionar item</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 80px 100px 90px 26px;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);padding:0 4px;margin-bottom:6px">
+        <span>Descrição</span><span>Qtd</span><span>Unitário</span><span>Total</span><span></span>
+      </div>
+      <div id="orc-modal-lines">
+        <div class="budget-line"><input placeholder="Serviço / Material" style="grid-column:1"><input value="1" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="0" placeholder="R$ 0,00" oninput="calcLine(this)"><span class="line-total" style="text-align:right;font-weight:600;color:var(--petrol-light)">R$ 0</span><button onclick="this.parentElement.remove();calcTotals()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px"><i class="ti ti-x"></i></button></div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;border:1px solid var(--border);font-size:13px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Margem (%)</label><input value="30" id="modal-margem" type="number" oninput="calcTotals()"></div>
+        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Desconto (R$)</label><input value="0" id="modal-desconto" type="number" oninput="calcTotals()"></div>
+        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Deslocamento (R$)</label><input value="0" id="modal-desloc" type="number" oninput="calcTotals()"></div>
+      </div>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:20px">
+        <span style="color:var(--text-muted)">Subtotal: <strong id="modal-subtotal" style="color:var(--text)">R$ 0</strong></span>
+        <span style="color:var(--green)">Lucro: <strong id="modal-lucro">R$ 0</strong></span>
+        <span style="color:var(--petrol-light);font-size:16px;font-weight:700">Total: <strong id="modal-total">R$ 0</strong></span>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:16px"><label>Condições de pagamento</label><input placeholder="Ex: 30% entrada, 70% na entrega"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-novo-orc')">Cancelar</button>
+      <button class="btn btn-secondary" onclick="showToast('Rascunho salvo','info');closeModal('modal-novo-orc')"><i class="ti ti-device-floppy"></i>Rascunho</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-novo-orc');showToast('Orçamento ORC-2848 criado!','success')"><i class="ti ti-send"></i>Criar e Enviar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-novo-cliente">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Cliente</div>
+      <button class="modal-close" onclick="closeModal('modal-novo-cliente')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row"><div class="field"><label>Nome / Razão Social</label><input placeholder="Nome completo ou empresa"></div><div class="field"><label>Tipo</label><select><option>CNPJ</option><option>CPF</option></select></div></div>
+    <div class="field-row"><div class="field"><label>CPF / CNPJ</label><input placeholder="00.000.000/0001-00"></div><div class="field"><label>Telefone</label><input placeholder="(11) 99999-0000"></div></div>
+    <div class="field"><label>E-mail</label><input type="email" placeholder="contato@empresa.com.br"></div>
+    <div class="field"><label>Endereço</label><input placeholder="Rua, número, bairro, cidade"></div>
+    <div class="field"><label>Observações internas</label><textarea placeholder="Notas sobre o cliente..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-novo-cliente')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-novo-cliente');showToast('Cliente cadastrado com sucesso!','success')"><i class="ti ti-check"></i>Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-lancamento">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-cash" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Lançamento</div>
+      <button class="modal-close" onclick="closeModal('modal-lancamento')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field"><label>Tipo</label><select><option>A Receber</option><option>A Pagar</option></select></div>
+    <div class="field-row"><div class="field"><label>Descrição</label><input placeholder="Ex: Parcela 2/3 — OB-0031"></div><div class="field"><label>Valor</label><input placeholder="R$ 0,00" type="text"></div></div>
+    <div class="field-row"><div class="field"><label>Vencimento</label><input type="date"></div><div class="field"><label>Categoria</label><select><option>Serviços</option><option>Material</option><option>Mão de obra</option><option>Administrativo</option></select></div></div>
+    <div class="field"><label>Vinculado a</label><select><option>Nenhum</option><option>OB-0031 — Reforma Horizonte</option><option>OB-0030 — Instalação Elétrica</option></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-lancamento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-lancamento');showToast('Lançamento criado!','success')"><i class="ti ti-check"></i>Criar Lançamento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-novo-membro">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Membro da Equipe</div>
+      <button class="modal-close" onclick="closeModal('modal-novo-membro')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row"><div class="field"><label>Nome completo</label><input placeholder="Nome do técnico"></div><div class="field"><label>Função</label><select><option>Eletricista</option><option>Encanador</option><option>Pedreiro</option><option>Mestre de Obras</option><option>Ajudante</option></select></div></div>
+    <div class="field-row"><div class="field"><label>Telefone</label><input placeholder="(11) 99999-0000"></div><div class="field"><label>E-mail</label><input type="email" placeholder="nome@email.com"></div></div>
+    <div class="field-row"><div class="field"><label>Diária (R$)</label><input placeholder="0,00" type="number"></div><div class="field"><label>Comissão (%)</label><input placeholder="0" type="number"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-novo-membro')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-novo-membro');showToast('Membro adicionado!','success')"><i class="ti ti-check"></i>Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nova-entrada">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-package-import" style="margin-right:8px;color:var(--petrol-light)"></i>Entrada de Estoque</div>
+      <button class="modal-close" onclick="closeModal('modal-nova-entrada')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field"><label>Material</label><select><option>Cabo PIAL 2,5mm</option><option>Tubo PVC 3/4&quot;</option><option>Disjuntor 20A</option><option>Cimento 50kg</option><option>+ Novo material</option></select></div>
+    <div class="field-row"><div class="field"><label>Quantidade</label><input type="number" placeholder="0"></div><div class="field"><label>Custo unitário (R$)</label><input placeholder="0,00" type="text"></div></div>
+    <div class="field"><label>Fornecedor</label><input placeholder="Nome do fornecedor"></div>
+    <div class="field"><label>Obra de destino (opcional)</label><select><option>Estoque geral</option><option>OB-0031 — Reforma Horizonte</option><option>OB-0030 — Instalação Elétrica</option></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-nova-entrada')">Cancelar</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-nova-entrada');showToast('Entrada registrada!','success')"><i class="ti ti-check"></i>Registrar Entrada</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast">
+  <span class="toast-icon"><i id="toast-icon-i" class="ti ti-check"></i></span>
+  <span id="toast-msg">Mensagem</span>
+</div>
+
+<script src="assets/js/app-part1.js"></script>
+<script src="assets/js/app-part2.js"></script>
+</body>
+</html>
