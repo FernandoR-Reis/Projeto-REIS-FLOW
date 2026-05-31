@@ -47,3 +47,5 @@ Guarde esses dados, porque no proximo passo vamos conectar seu site com o banco.
 3. Verifique se existem registros.
 
 Se aparecer dados nessas tabelas, o banco foi criado com sucesso.
+
+

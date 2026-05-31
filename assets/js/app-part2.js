@@ -182,6 +182,13 @@ function setFinTab(tab, element) {
 }
 
 function openModal(id) {
+  if (typeof canAccessModal === 'function' && !canAccessModal(id)) {
+    if (typeof showAccessDenied === 'function') {
+      showAccessDenied(id.replace('modal-', '').replace(/-/g, ' '));
+    }
+    return;
+  }
+
   document.getElementById(id).classList.add('open');
 }
 
@@ -276,9 +283,14 @@ function switchLoginTab(tab, button) {
   document.getElementById('recover-form').style.display = tab === 'recover' ? 'block' : 'none';
 }
 
-function goToApp(nome) {
+function goToApp(nome, cargo = 'operador') {
+  if (typeof setCurrentUserContext === 'function') {
+    setCurrentUserContext(nome, cargo);
+  }
+
   document.getElementById('page-login').classList.remove('active');
   document.getElementById('page-app').classList.add('active');
+  if (typeof applyRolePermissions === 'function') applyRolePermissions();
   buildDashChart();
   loadAllData();
   setTimeout(() => {
@@ -298,6 +310,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (event.target === overlay) overlay.classList.remove('open');
     });
   });
+
+  if (typeof applyRolePermissions === 'function') applyRolePermissions();
 
   calcTotals();
 

@@ -36,6 +36,143 @@ const orcPreviewItems = [
   {desc:'Mão de obra — equipe 4 pessoas · 5 dias',qtd:1,unit:'R$ 12.800',total:'R$ 12.800'},
 ];
 
+const ROLE_ACCESS = {
+  admin: {
+    label: 'Administrador',
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'configuracoes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-novo-cliente', 'modal-lancamento', 'modal-novo-membro', 'modal-nova-entrada']
+  },
+  gestor: {
+    label: 'Gestor',
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'configuracoes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-novo-cliente', 'modal-lancamento', 'modal-novo-membro', 'modal-nova-entrada']
+  },
+  financeiro: {
+    label: 'Financeiro',
+    views: ['dashboard', 'financeiro'],
+    modals: ['modal-lancamento']
+  },
+  tecnico: {
+    label: 'Técnico',
+    views: ['dashboard', 'obras', 'estoque'],
+    modals: ['modal-nova-entrada']
+  },
+  operador: {
+    label: 'Operador',
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-novo-cliente']
+  }
+};
+
+function normalizeRole(role) {
+  const value = String(role || 'operador').toLowerCase();
+  return ROLE_ACCESS[value] ? value : 'operador';
+}
+
+function getCurrentRole() {
+  return normalizeRole(sessionStorage.getItem('reisflow_role'));
+}
+
+function getCurrentUserName() {
+  return sessionStorage.getItem('reisflow_user_name') || '';
+}
+
+function setCurrentUserContext(nome, cargo) {
+  sessionStorage.setItem('reisflow_user_name', nome || '');
+  sessionStorage.setItem('reisflow_role', normalizeRole(cargo));
+}
+
+function canAccessView(view) {
+  const role = getCurrentRole();
+  return ROLE_ACCESS[role].views.includes(view);
+}
+
+function canAccessModal(id) {
+  const role = getCurrentRole();
+  return ROLE_ACCESS[role].modals.includes(id);
+}
+
+function applyRolePermissions() {
+  const role = getCurrentRole();
+  const access = ROLE_ACCESS[role];
+  const allowedViews = new Set(access.views);
+
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    const handler = item.getAttribute('onclick') || '';
+    const match = handler.match(/navigate\('([^']+)'/);
+    if (!match) return;
+
+    const view = match[1];
+    item.style.display = allowedViews.has(view) ? '' : 'none';
+  });
+
+  document.querySelectorAll('.user-role').forEach((el) => {
+    el.textContent = access.label;
+  });
+
+  const userCardName = document.querySelector('.user-card .user-name');
+  if (userCardName && getCurrentUserName()) {
+    userCardName.textContent = getCurrentUserName();
+  }
+
+  const avatar = document.querySelector('.user-card .avatar');
+  if (avatar && getCurrentUserName()) {
+    const initials = getCurrentUserName()
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase();
+    avatar.textContent = initials || avatar.textContent;
+  }
+
+  document.querySelectorAll('button[onclick]').forEach((button) => {
+    const handler = button.getAttribute('onclick') || '';
+    const modalMatch = handler.match(/openModal\('([^']+)'/);
+
+    if (handler.includes('openQuickCreate()')) {
+      button.style.display = canAccessModal('modal-nova-obra') ? '' : 'none';
+      return;
+    }
+
+    if (modalMatch) {
+      button.style.display = canAccessModal(modalMatch[1]) ? '' : 'none';
+    }
+  });
+}
+
+function applyObraDetailAccess() {
+  const role = getCurrentRole();
+  const canSeeFinance = ['admin', 'gestor', 'financeiro'].includes(role);
+  const canSeeOps = ['admin', 'gestor', 'tecnico', 'operador'].includes(role);
+
+  const cards = document.querySelectorAll('#view-obra-detail .card');
+  cards.forEach((card) => {
+    const title = card.querySelector('.section-hdr h3');
+    const titleText = title ? title.textContent.trim().toLowerCase() : '';
+
+    if (titleText.includes('financeiro da obra')) {
+      card.style.display = canSeeFinance ? '' : 'none';
+    }
+
+    if (titleText.includes('etapas da obra') || titleText.includes('histórico') || titleText.includes('galeria de fotos')) {
+      card.style.display = canSeeOps ? '' : 'none';
+    }
+  });
+
+  document.querySelectorAll('#view-obra-detail .detail-header .btn').forEach((button) => {
+    const text = button.textContent.trim().toLowerCase();
+    if (text.includes('editar') || text.includes('relatório')) {
+      button.style.display = ['admin', 'gestor'].includes(role) ? '' : 'none';
+    }
+  });
+}
+
+function showAccessDenied(view) {
+  showToast(`Acesso restrito para este perfil em ${view || 'esta área'}.`, 'warning');
+}
+
 function statusBadge(status) {
   const map = {
     andamento:'<span class="badge badge-info"><span class="badge-dot"></span>Em andamento</span>',
@@ -65,6 +202,11 @@ function setBreadcrumb(viewLabel) {
 }
 
 function navigate(view, element) {
+  if (!canAccessView(view)) {
+    showAccessDenied(view);
+    return;
+  }
+
   document.querySelectorAll('.view').forEach((section) => {
     section.style.display = 'none';
   });
@@ -130,6 +272,11 @@ function populateObraDetail(code) {
 }
 
 function openObraDetail(code) {
+  if (!canAccessView('obras')) {
+    showAccessDenied('obras');
+    return;
+  }
+
   document.querySelectorAll('.view').forEach((section) => {
     section.style.display = 'none';
   });
@@ -138,6 +285,7 @@ function openObraDetail(code) {
   document.getElementById('view-obra-detail').className = 'view fade-in';
   document.getElementById('topbar-breadcrumb').innerHTML = `<span>REIS FLOW</span><span class="sep">/</span><span onclick="navigate('obras',null)" style="cursor:pointer;color:var(--petrol-light)">Obras</span><span class="sep">/</span><span class="cur">${code}</span>`;
   populateObraDetail(code);
+  applyObraDetailAccess();
 }
 
 function populateObras() {
