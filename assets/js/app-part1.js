@@ -224,6 +224,91 @@ function populateOrcPreview() {
   });
 }
 
+// =============================================================
+//  Carregamento de dados reais do Supabase
+//  Esta função substitui os dados fixos do código pelos dados
+//  reais que estão salvos no banco de dados.
+// =============================================================
+async function loadAllData() {
+  try {
+    const [resObras, resOrc, resCli] = await Promise.all([
+      db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }),
+      db.from('orcamentos').select('*, clientes(nome)').order('created_at', { ascending: false }),
+      db.from('clientes').select('*').order('nome')
+    ]);
+
+    // Sobrescreve os arrays do sistema com dados reais
+    if (resObras.data && resObras.data.length > 0) {
+      obras.length = 0;
+      resObras.data.forEach(o => {
+        obras.push({
+          code: o.codigo,
+          name: o.nome,
+          client: o.clientes?.nome || '—',
+          resp: o.responsavel_nome || '—',
+          prazo: o.prazo ? new Date(o.prazo).toLocaleDateString('pt-BR') : '—',
+          valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
+          status: o.status,
+          location: o.localizacao || '—'
+        });
+      });
+      // Força atualização da tabela ao reentrar na view
+      const tbody = document.getElementById('obras-tbody');
+      if (tbody) tbody.innerHTML = '';
+      const kanban = document.getElementById('obras-kanban');
+      if (kanban) kanban.innerHTML = '';
+    }
+
+    if (resOrc.data && resOrc.data.length > 0) {
+      orcamentos.length = 0;
+      resOrc.data.forEach(o => {
+        orcamentos.push({
+          code: o.codigo,
+          client: o.clientes?.nome || '—',
+          desc: o.descricao,
+          valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
+          margem: Number(o.margem_percentual).toFixed(0) + '%',
+          validade: o.validade ? new Date(o.validade).toLocaleDateString('pt-BR') : '—',
+          status: o.status
+        });
+      });
+      const orcTbody = document.getElementById('orc-tbody');
+      if (orcTbody) orcTbody.innerHTML = '';
+    }
+
+    if (resCli.data && resCli.data.length > 0) {
+      clientes.length = 0;
+      const cores = [
+        'linear-gradient(135deg,#1B4F6B,#2176A3)',
+        'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
+        'linear-gradient(135deg,#0F6E56,#1D9E75)',
+        'linear-gradient(135deg,#6B3A1F,#A3612A)',
+        'linear-gradient(135deg,#1A1D24,#3A4055)',
+        'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
+      ];
+      resCli.data.forEach((c, i) => {
+        const partes = c.nome.split(' ');
+        const iniciais = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : c.nome.slice(0, 2);
+        clientes.push({
+          name: c.nome,
+          tipo: c.tipo_documento,
+          doc: c.documento,
+          tel: c.telefone || '—',
+          obras: 0,
+          total: 'R$ —',
+          status: c.status,
+          initials: iniciais.toUpperCase(),
+          bg: cores[i % cores.length]
+        });
+      });
+      const cliTbody = document.getElementById('cli-tbody');
+      if (cliTbody) cliTbody.innerHTML = '';
+    }
+  } catch (err) {
+    console.warn('Supabase não configurado — usando dados de exemplo.', err);
+  }
+}
+
 function populateClientes() {
   const tbody = document.getElementById('cli-tbody');
   if (!tbody || tbody.children.length > 0) return;

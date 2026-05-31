@@ -276,12 +276,14 @@ function switchLoginTab(tab, button) {
   document.getElementById('recover-form').style.display = tab === 'recover' ? 'block' : 'none';
 }
 
-function goToApp() {
+function goToApp(nome) {
   document.getElementById('page-login').classList.remove('active');
   document.getElementById('page-app').classList.add('active');
   buildDashChart();
+  loadAllData();
   setTimeout(() => {
-    showToast('Bem-vindo ao REIS FLOW, Carlos!', 'success');
+    const saudacao = nome ? `Bem-vindo, ${nome.split(' ')[0]}!` : 'Bem-vindo ao REIS FLOW!';
+    showToast(saudacao, 'success');
   }, 300);
 }
 

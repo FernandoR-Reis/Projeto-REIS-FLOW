@@ -53,18 +53,18 @@
           <label class="form-label">E-mail</label>
           <div class="form-input-icon">
             <i class="ti ti-mail"></i>
-            <input class="form-input" type="email" placeholder="admin@reisflow.com.br" value="admin@reisflow.com.br">
+            <input id="login-email" class="form-input" type="email" placeholder="admin@reisflow.com.br" value="admin@reisflow.com.br">
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Senha</label>
           <div class="form-input-icon">
             <i class="ti ti-lock"></i>
-            <input class="form-input" type="password" placeholder="••••••••" value="••••••••">
+            <input id="login-password" class="form-input" type="password" placeholder="••••••••" value="••••••••">
           </div>
         </div>
         <div class="login-forgot"><a onclick="switchLoginTab('recover',null)">Esqueceu a senha?</a></div>
-        <button class="btn-login" onclick="goToApp()">
+        <button id="btn-login" class="btn-login" onclick="loginUser()">
           <i class="ti ti-arrow-right" style="margin-right:6px"></i>Acessar o sistema
         </button>
         <div class="login-divider">ou continue com</div>
@@ -85,18 +85,18 @@
       </div>
 
       <div id="register-form" style="display:none">
-        <div class="form-group"><label class="form-label">Nome completo</label><div class="form-input-icon"><i class="ti ti-user"></i><input class="form-input" type="text" placeholder="Carlos Eduardo Reis"></div></div>
-        <div class="form-group"><label class="form-label">E-mail empresarial</label><div class="form-input-icon"><i class="ti ti-mail"></i><input class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
-        <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input class="form-input" type="text" placeholder="Reis Obras e Serviços Ltda"></div></div>
+        <div class="form-group"><label class="form-label">Nome completo</label><div class="form-input-icon"><i class="ti ti-user"></i><input id="register-nome" class="form-input" type="text" placeholder="Carlos Eduardo Reis"></div></div>
+        <div class="form-group"><label class="form-label">E-mail empresarial</label><div class="form-input-icon"><i class="ti ti-mail"></i><input id="register-email" class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
+        <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input id="register-empresa" class="form-input" type="text" placeholder="Reis Obras e Serviços Ltda"></div></div>
         <div class="form-group"><label class="form-label">Telefone</label><div class="form-input-icon"><i class="ti ti-phone"></i><input class="form-input" type="tel" placeholder="(11) 99999-0000"></div></div>
-        <div class="form-group"><label class="form-label">Senha</label><div class="form-input-icon"><i class="ti ti-lock"></i><input class="form-input" type="password" placeholder="Mínimo 8 caracteres"></div></div>
-        <button class="btn-login" onclick="showToast('Conta criada! Redirecionando...','success');setTimeout(goToApp,1500)">Criar conta grátis</button>
+        <div class="form-group"><label class="form-label">Senha</label><div class="form-input-icon"><i class="ti ti-lock"></i><input id="register-senha" class="form-input" type="password" placeholder="Mínimo 6 caracteres"></div></div>
+        <button id="btn-register" class="btn-login" onclick="registerUser()">Criar conta grátis</button>
       </div>
 
       <div id="recover-form" style="display:none">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.6">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
-        <div class="form-group"><label class="form-label">E-mail cadastrado</label><div class="form-input-icon"><i class="ti ti-mail"></i><input class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
-        <button class="btn-login" onclick="showToast('Link enviado para seu e-mail!','success')">Enviar link de recuperação</button>
+        <div class="form-group"><label class="form-label">E-mail cadastrado</label><div class="form-input-icon"><i class="ti ti-mail"></i><input id="recover-email" class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
+        <button id="btn-recover" class="btn-login" onclick="recoverUser()">Enviar link de recuperação</button>
         <p style="text-align:center;margin-top:16px"><button onclick="switchLoginTab('login',null)" style="background:none;border:none;color:var(--petrol-light);font-size:13px;cursor:pointer">← Voltar ao login</button></p>
       </div>
     </div>
@@ -162,7 +162,7 @@
           <span class="notif-dot"></span>
         </button>
         <button class="btn btn-primary btn-sm" onclick="openQuickCreate()"><i class="ti ti-plus"></i>Nova OS</button>
-        <button class="icon-btn" onclick="goToLogin()" title="Sair"><i class="ti ti-logout"></i></button>
+        <button class="icon-btn" onclick="logoutUser()" title="Sair"><i class="ti ti-logout"></i></button>
       </div>
     </div>
 
@@ -881,7 +881,10 @@
   <span id="toast-msg">Mensagem</span>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-config.js"></script>
 <script src="assets/js/app-part1.js"></script>
 <script src="assets/js/app-part2.js"></script>
+<script src="assets/js/auth.js"></script>
 </body>
 </html>
