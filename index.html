@@ -751,15 +751,15 @@
       <div class="modal-title"><i class="ti ti-building-factory-2" style="margin-right:8px;color:var(--petrol-light)"></i>Nova Obra</div>
       <button class="modal-close" onclick="closeModal('modal-nova-obra')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field-row"><div class="field"><label>Código (auto)</label><input value="OB-0032" disabled style="opacity:0.5"></div><div class="field"><label>Título da Obra</label><input placeholder="Ex: Reforma elétrica completa"></div></div>
-    <div class="field-row"><div class="field"><label>Cliente</label><select><option>Construtora Horizonte</option><option>Grupo Inova</option><option>TechFix Soluções</option><option>+ Novo cliente</option></select></div><div class="field"><label>Responsável</label><select><option>Diego Santos</option><option>Ana Moura</option><option>Pedro Lima</option></select></div></div>
-    <div class="field"><label>Endereço da obra</label><input placeholder="Rua, número, bairro, cidade"></div>
-    <div class="field-row"><div class="field"><label>Data de início</label><input type="date"></div><div class="field"><label>Prazo de entrega</label><input type="date"></div></div>
-    <div class="field-row"><div class="field"><label>Prioridade</label><select><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div><div class="field"><label>Valor da proposta</label><input placeholder="R$ 0,00" type="text"></div></div>
+    <div class="field-row"><div class="field"><label>Código (auto)</label><input id="obra-codigo" value="OB-0032" disabled style="opacity:0.5"></div><div class="field"><label>Título da Obra</label><input id="obra-nome" placeholder="Ex: Reforma elétrica completa"></div></div>
+    <div class="field-row"><div class="field"><label>Cliente</label><select id="obra-cliente-id"><option value="">Carregando...</option></select></div><div class="field"><label>Responsável</label><input id="obra-responsavel" placeholder="Nome do responsável"></div></div>
+    <div class="field"><label>Endereço da obra</label><input id="obra-localizacao" placeholder="Rua, número, bairro, cidade"></div>
+    <div class="field-row"><div class="field"><label>Data de início</label><input type="date"></div><div class="field"><label>Prazo de entrega</label><input id="obra-prazo" type="date"></div></div>
+    <div class="field-row"><div class="field"><label>Prioridade</label><select><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div><div class="field"><label>Valor da proposta</label><input id="obra-valor" placeholder="R$ 0,00" type="text"></div></div>
     <div class="field"><label>Observações</label><textarea placeholder="Descrição do escopo, condições especiais..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-nova-obra')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-nova-obra');showToast('Obra OB-0032 criada!','success')"><i class="ti ti-check"></i>Criar Obra</button>
+      <button class="btn btn-primary" onclick="salvarObra()"><i class="ti ti-check"></i>Criar Obra</button>
     </div>
   </div>
 </div>
@@ -770,8 +770,8 @@
       <div class="modal-title"><i class="ti ti-file-dollar" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Orçamento</div>
       <button class="modal-close" onclick="closeModal('modal-novo-orc')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field-row"><div class="field"><label>Cliente</label><select><option>Construtora Horizonte</option><option>Grupo Inova</option><option>TechFix</option></select></div><div class="field"><label>Validade</label><input type="date"></div></div>
-    <div class="field"><label>Descrição do Serviço</label><input placeholder="Ex: Reforma elétrica completa — galpão industrial"></div>
+    <div class="field-row"><div class="field"><label>Cliente</label><select id="orc-cliente-id"><option value="">Carregando...</option></select></div><div class="field"><label>Validade</label><input id="orc-validade" type="date"></div></div>
+    <div class="field"><label>Descrição do Serviço</label><input id="orc-descricao" placeholder="Ex: Reforma elétrica completa — galpão industrial"></div>
 
     <div style="margin:16px 0">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -803,7 +803,7 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-novo-orc')">Cancelar</button>
       <button class="btn btn-secondary" onclick="showToast('Rascunho salvo','info');closeModal('modal-novo-orc')"><i class="ti ti-device-floppy"></i>Rascunho</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-novo-orc');showToast('Orçamento ORC-2848 criado!','success')"><i class="ti ti-send"></i>Criar e Enviar</button>
+      <button class="btn btn-primary" onclick="salvarOrcamento()"><i class="ti ti-send"></i>Criar e Enviar</button>
     </div>
   </div>
 </div>
@@ -814,14 +814,14 @@
       <div class="modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Cliente</div>
       <button class="modal-close" onclick="closeModal('modal-novo-cliente')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field-row"><div class="field"><label>Nome / Razão Social</label><input placeholder="Nome completo ou empresa"></div><div class="field"><label>Tipo</label><select><option>CNPJ</option><option>CPF</option></select></div></div>
-    <div class="field-row"><div class="field"><label>CPF / CNPJ</label><input placeholder="00.000.000/0001-00"></div><div class="field"><label>Telefone</label><input placeholder="(11) 99999-0000"></div></div>
-    <div class="field"><label>E-mail</label><input type="email" placeholder="contato@empresa.com.br"></div>
+    <div class="field-row"><div class="field"><label>Nome / Razão Social</label><input id="cli-nome" placeholder="Nome completo ou empresa"></div><div class="field"><label>Tipo</label><select id="cli-tipo"><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select></div></div>
+    <div class="field-row"><div class="field"><label>CPF / CNPJ</label><input id="cli-doc" placeholder="00.000.000/0001-00"></div><div class="field"><label>Telefone</label><input id="cli-tel" placeholder="(11) 99999-0000"></div></div>
+    <div class="field"><label>E-mail</label><input id="cli-email" type="email" placeholder="contato@empresa.com.br"></div>
     <div class="field"><label>Endereço</label><input placeholder="Rua, número, bairro, cidade"></div>
     <div class="field"><label>Observações internas</label><textarea placeholder="Notas sobre o cliente..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-novo-cliente')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-novo-cliente');showToast('Cliente cadastrado com sucesso!','success')"><i class="ti ti-check"></i>Cadastrar</button>
+      <button class="btn btn-primary" onclick="salvarCliente()"><i class="ti ti-check"></i>Cadastrar</button>
     </div>
   </div>
 </div>
@@ -886,5 +886,6 @@
 <script src="assets/js/app-part1.js"></script>
 <script src="assets/js/app-part2.js"></script>
 <script src="assets/js/auth.js"></script>
+<script src="assets/js/crud.js"></script>
 </body>
 </html>
