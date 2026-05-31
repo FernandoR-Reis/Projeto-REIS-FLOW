@@ -5,6 +5,8 @@
 // Verifica se o usuário já está logado ao abrir o site.
 // Se sim, vai direto para o sistema sem mostrar a tela de login.
 window.addEventListener('DOMContentLoaded', async () => {
+  setLoginLoading(false);
+
   if (isLocalAdminSession()) {
     goToApp('Administrador', 'admin');
     return;
@@ -328,15 +330,12 @@ function bindLoginLoaderEvents() {
     if (btn.dataset.bound) return;
     btn.dataset.bound = '1';
     btn.addEventListener('click', () => {
+      if (typeof window.setTheme === 'function') {
+        window.setTheme(btn.dataset.theme);
+      }
       loginLoaderSetTheme(btn.dataset.theme);
     });
   });
-}
-
-function ensureMinimumDelay(startedAt, minMs) {
-  const elapsed = Date.now() - startedAt;
-  if (elapsed >= minMs) return Promise.resolve();
-  return wait(minMs - elapsed);
 }
 
 function setLoginLoading(active) {
@@ -345,12 +344,17 @@ function setLoginLoading(active) {
 
   if (overlay) {
     overlay.classList.toggle('open', active);
+    overlay.style.display = active ? 'block' : 'none';
     overlay.setAttribute('aria-hidden', active ? 'false' : 'true');
   }
 
   if (active) {
     loaderRunToken += 1;
     bindLoginLoaderEvents();
+    const currentTheme = typeof window.getCurrentTheme === 'function'
+      ? window.getCurrentTheme()
+      : 'dark';
+    loginLoaderSetTheme(currentTheme);
     runLoginLoaderSequence(loaderRunToken);
   } else {
     loaderRunToken += 1;
@@ -395,11 +399,9 @@ async function loginUser() {
     return;
   }
 
-  const loginStart = Date.now();
-  setLoginLoading(true);
-
   if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada.toUpperCase() === ADMIN_PASSWORD) {
-    await ensureMinimumDelay(loginStart, LOGIN_TRANSITION_MS);
+    setLoginLoading(true);
+    await wait(LOGIN_TRANSITION_MS);
     setLoginLoading(false);
     setLocalAdminSession(true);
     goToApp('Administrador', 'admin');
@@ -409,13 +411,12 @@ async function loginUser() {
   const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
 
   if (error) {
-    await ensureMinimumDelay(loginStart, 1200);
-    setLoginLoading(false);
     showToast('E-mail ou senha incorretos', 'error');
     return;
   }
 
-  await ensureMinimumDelay(loginStart, LOGIN_TRANSITION_MS);
+  setLoginLoading(true);
+  await wait(LOGIN_TRANSITION_MS);
   setLoginLoading(false);
   await abrirComPerfil(data.user);
 }

@@ -42,6 +42,10 @@
     </div>
 
     <div class="login-card">
+      <div class="theme-switch" aria-label="Alternar tema">
+        <button class="theme-switch-btn active" type="button" data-theme-value="dark">Dark</button>
+        <button class="theme-switch-btn" type="button" data-theme-value="light">Light</button>
+      </div>
       <div class="login-tabs">
         <button class="login-tab active" onclick="switchLoginTab('login',this)">Entrar</button>
         <button class="login-tab" onclick="switchLoginTab('register',this)">Cadastrar</button>
@@ -102,7 +106,7 @@
     </div>
   </div>
 
-  <div class="login-loading" id="login-loading" aria-hidden="true">
+  <div class="login-loading" id="login-loading" aria-hidden="true" style="display:none">
     <div class="loader-root" id="loader">
       <div class="bg-glow"></div>
       <div class="bg-grid"></div>
@@ -215,6 +219,9 @@
         <input type="text" placeholder="Buscar obras, clientes, OS...">
       </div>
       <div class="topbar-actions">
+        <button class="icon-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Alternar tema">
+          <i class="ti ti-moon"></i>
+        </button>
         <button class="icon-btn" onclick="showToast('Nenhuma atualização disponível','info')"><i class="ti ti-refresh"></i></button>
         <button class="icon-btn" onclick="showNotifPanel()">
           <i class="ti ti-bell"></i>
@@ -942,8 +949,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/theme.js"></script>
 <script src="assets/js/app-part1.js"></script>
 <script src="assets/js/app-part2.js"></script>
+<script src="assets/js/protection.js"></script>
 <script src="assets/js/auth.js"></script>
 <script src="assets/js/crud.js"></script>
 </body>
