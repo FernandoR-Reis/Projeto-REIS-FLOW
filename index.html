@@ -48,7 +48,7 @@
         <button class="login-tab" onclick="switchLoginTab('recover',this)">Recuperar</button>
       </div>
 
-      <div id="login-form">
+      <form id="login-form" onsubmit="loginUser(); return false;">
         <div class="form-group">
           <label class="form-label">E-mail</label>
           <div class="form-input-icon">
@@ -64,7 +64,7 @@
           </div>
         </div>
         <div class="login-forgot"><a onclick="switchLoginTab('recover',null)">Esqueceu a senha?</a></div>
-        <button id="btn-login" class="btn-login" onclick="loginUser()">
+        <button id="btn-login" class="btn-login" type="submit">
           <i class="ti ti-arrow-right" style="margin-right:6px"></i>Acessar o sistema
         </button>
         <div class="login-divider">ou continue com</div>
@@ -82,7 +82,7 @@
             Abrir link de teste
           </a>
         </p>
-      </div>
+      </form>
 
       <div id="register-form" style="display:none">
         <div class="form-group"><label class="form-label">Nome completo</label><div class="form-input-icon"><i class="ti ti-user"></i><input id="register-nome" class="form-input" type="text" placeholder="Carlos Eduardo Reis"></div></div>
@@ -98,6 +98,65 @@
         <div class="form-group"><label class="form-label">E-mail cadastrado</label><div class="form-input-icon"><i class="ti ti-mail"></i><input id="recover-email" class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
         <button id="btn-recover" class="btn-login" onclick="recoverUser()">Enviar link de recuperação</button>
         <p style="text-align:center;margin-top:16px"><button onclick="switchLoginTab('login',null)" style="background:none;border:none;color:var(--petrol-light);font-size:13px;cursor:pointer">← Voltar ao login</button></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="login-loading" id="login-loading" aria-hidden="true">
+    <div class="loader-root" id="loader">
+      <div class="bg-glow"></div>
+      <div class="bg-grid"></div>
+
+      <div class="theme-toggle">
+        <button class="theme-btn active" data-theme="dark">Dark</button>
+        <button class="theme-btn" data-theme="light">Light</button>
+      </div>
+
+      <button class="replay-btn" id="replay-btn" type="button">↺ Replay</button>
+
+      <div class="logo-section" id="logo-section">
+        <div class="logo-row">
+          <svg width="40" height="40" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+            <rect width="44" height="44" rx="12" fill="#1B4F6B"/>
+            <rect x="0.5" y="0.5" width="43" height="43" rx="11.5" stroke="rgba(255,255,255,0.15)"/>
+            <circle cx="11" cy="11" r="1.5" fill="rgba(255,255,255,0.18)"/>
+            <circle cx="22" cy="11" r="1.5" fill="rgba(255,255,255,0.18)"/>
+            <circle cx="33" cy="11" r="1.5" fill="rgba(255,255,255,0.18)"/>
+            <circle cx="11" cy="22" r="3.5" fill="#3AACDF"/>
+            <circle cx="33" cy="22" r="3.5" fill="#3AACDF"/>
+            <path d="M11 22 C11 16,22 16,22 22 C22 28,33 28,33 22" stroke="#3AACDF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          </svg>
+          <div class="logo-text">REIS <span>FLOW</span></div>
+        </div>
+        <div class="logo-tagline" id="preparing-text">Preparando seu ambiente de trabalho...</div>
+      </div>
+
+      <div class="module-stage" id="module-stage">
+        <div class="module-card" id="module-card">
+          <div class="module-icon" id="module-icon"></div>
+          <div class="module-info">
+            <div class="module-name" id="module-name"></div>
+            <div class="module-desc" id="module-desc"></div>
+          </div>
+          <div id="module-status"></div>
+        </div>
+        <div class="dots-row" id="dots-row"></div>
+      </div>
+
+      <div class="progress-section">
+        <div class="progress-message" id="progress-msg">Sincronizando informações</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="done-overlay" id="done-overlay" aria-live="polite">
+        <div class="done-icon-wrap">
+          <i class="ti ti-check" style="font-size:26px;color:#2DD4A0"></i>
+        </div>
+        <div class="done-title">Tudo pronto!</div>
+        <div class="done-sub">Redirecionando para o dashboard...</div>
+        <div class="done-progress"><div class="done-progress-fill"></div></div>
       </div>
     </div>
   </div>
