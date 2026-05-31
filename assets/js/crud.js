@@ -93,17 +93,58 @@ function parseMoeda(str) {
   return parseFloat(str.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
-// Preenche o <select> de clientes em um modal a partir do banco
+function adicionarClienteNoMapa(mapa, registro) {
+  if (!registro) return;
+
+  const nome = String(registro.nome || registro.name || '').trim();
+  if (!nome) return;
+
+  const doc = String(registro.documento || registro.doc || '').trim();
+  const docKey = doc ? doc.replace(/\D/g, '') : '';
+  const nomeKey = nome.toLowerCase();
+  const key = docKey || nomeKey;
+
+  if (mapa.has(key)) return;
+
+  mapa.set(key, {
+    id: registro.id || null,
+    nome,
+    doc
+  });
+}
+
+async function obterClientesParaSelect() {
+  const mapa = new Map();
+
+  try {
+    const { data } = await db.from('clientes').select('id, nome, documento').order('nome');
+    if (Array.isArray(data)) {
+      data.forEach((c) => adicionarClienteNoMapa(mapa, c));
+    }
+  } catch {
+    // Ignora falha do banco e usa fallback local.
+  }
+
+  if (Array.isArray(clientes)) {
+    clientes.forEach((c) => adicionarClienteNoMapa(mapa, c));
+  }
+
+  lerClientesDemoLocal().forEach((c) => adicionarClienteNoMapa(mapa, c));
+
+  return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+// Preenche o <select> de clientes em um modal com banco + fallback local
 async function carregarClientesNoSelect(selectId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
 
-  const { data, error } = await db.from('clientes').select('id, nome').order('nome');
-  if (error || !data) return;
+  const lista = await obterClientesParaSelect();
 
   sel.innerHTML = '<option value="">Selecione um cliente</option>';
-  data.forEach(c => {
-    sel.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+  lista.forEach((c) => {
+    const value = c.id || `local:${encodeURIComponent(c.doc || c.nome)}`;
+    sel.innerHTML += `<option value="${value}">${c.nome}</option>`;
   });
 }
 
@@ -114,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     carregarClientesNoSelect('obra-cliente-id');
     carregarClientesNoSelect('orc-cliente-id');
+    carregarClientesNoSelect('fin-cliente-id');
   }, 1500);
 });
 
@@ -123,6 +165,7 @@ window.openModal = function(id) {
   _openModalOriginal(id);
   if (id === 'modal-nova-obra') carregarClientesNoSelect('obra-cliente-id');
   if (id === 'modal-novo-orc')  carregarClientesNoSelect('orc-cliente-id');
+  if (id === 'modal-lancamento') carregarClientesNoSelect('fin-cliente-id');
 };
 
 
