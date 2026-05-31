@@ -28,6 +28,56 @@ const clientes = [
   {name:'Clínica Saúde Total',tipo:'CNPJ',doc:'33.444.555/0001-66',tel:'(11) 4003-8888',obras:1,total:'R$ 9k',status:'ativo',initials:'ST',bg:'linear-gradient(135deg,#1A4B3B,#2A8A6B)'},
 ];
 
+const DEMO_CLIENTES_STORAGE_KEY = 'reisflow_demo_clientes';
+
+function obterClientesDemoLocal() {
+  try {
+    const raw = localStorage.getItem(DEMO_CLIENTES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function anexarClientesDemoLocal() {
+  const demos = obterClientesDemoLocal();
+  if (!demos.length) return;
+
+  const docsExistentes = new Set(clientes.map((c) => String(c.doc || '').replace(/\D/g, '')));
+  const cores = [
+    'linear-gradient(135deg,#1B4F6B,#2176A3)',
+    'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
+    'linear-gradient(135deg,#0F6E56,#1D9E75)',
+    'linear-gradient(135deg,#6B3A1F,#A3612A)',
+    'linear-gradient(135deg,#1A1D24,#3A4055)',
+    'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
+  ];
+
+  demos.forEach((c, index) => {
+    const docLimpo = String(c.doc || '').replace(/\D/g, '');
+    if (docsExistentes.has(docLimpo)) return;
+
+    const partes = String(c.name || '').trim().split(/\s+/).filter(Boolean);
+    const iniciais = partes.length > 1
+      ? (partes[0][0] + partes[partes.length - 1][0])
+      : String(c.name || '').slice(0, 2);
+
+    clientes.push({
+      name: c.name,
+      tipo: c.tipo,
+      doc: c.doc,
+      tel: c.tel || '—',
+      obras: 0,
+      total: 'R$ —',
+      status: c.status || 'ativo',
+      initials: String(iniciais || 'CL').toUpperCase(),
+      bg: cores[(clientes.length + index) % cores.length]
+    });
+  });
+}
+
 const orcPreviewItems = [
   {desc:'Cabeamento elétrico 2,5mm — 200m',qtd:200,unit:'R$ 2,40',total:'R$ 480'},
   {desc:'Quadro distribuição 24 disjuntores',qtd:2,unit:'R$ 380,00',total:'R$ 760'},
@@ -452,8 +502,11 @@ async function loadAllData() {
       const cliTbody = document.getElementById('cli-tbody');
       if (cliTbody) cliTbody.innerHTML = '';
     }
+
+    anexarClientesDemoLocal();
   } catch (err) {
     console.warn('Supabase não configurado — usando dados de exemplo.', err);
+    anexarClientesDemoLocal();
   }
 }
 

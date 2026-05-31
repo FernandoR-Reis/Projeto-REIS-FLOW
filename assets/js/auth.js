@@ -400,9 +400,27 @@ async function loginUser() {
   }
 
   if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada.toUpperCase() === ADMIN_PASSWORD) {
+    let demoData = null;
+    let demoError = null;
+
+    try {
+      const authResponse = await db.auth.signInWithPassword({ email, password: senha });
+      demoData = authResponse.data;
+      demoError = authResponse.error;
+    } catch (err) {
+      demoError = err;
+    }
+
     setLoginLoading(true);
     await wait(LOGIN_TRANSITION_MS);
     setLoginLoading(false);
+
+    if (!demoError && demoData?.user) {
+      setLocalAdminSession(false);
+      await abrirComPerfil(demoData.user);
+      return;
+    }
+
     setLocalAdminSession(true);
     goToApp('Administrador', 'admin');
     return;
