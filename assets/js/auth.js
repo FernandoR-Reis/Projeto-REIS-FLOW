@@ -23,7 +23,7 @@ function isLocalHost() {
 }
 
 function isLocalAdminSession() {
-  return isLocalHost() && sessionStorage.getItem('reisflow_admin_local') === '1';
+  return sessionStorage.getItem('reisflow_admin_local') === '1';
 }
 
 function setLocalAdminSession(active) {
@@ -399,7 +399,7 @@ async function loginUser() {
     return;
   }
 
-  if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada.toUpperCase() === ADMIN_PASSWORD) {
+  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada.toUpperCase() === ADMIN_PASSWORD) {
     setLoginLoading(true);
     await wait(LOGIN_TRANSITION_MS);
     setLoginLoading(false);
