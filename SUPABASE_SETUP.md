@@ -48,4 +48,10 @@ Guarde esses dados, porque no proximo passo vamos conectar seu site com o banco.
 
 Se aparecer dados nessas tabelas, o banco foi criado com sucesso.
 
+## 6) Validar no dominio provisório
+
+Depois da configuracao, valide tambem no ambiente publicado:
+
+- https://fernandor-reis.github.io/Projeto-REIS-FLOW/
+
 

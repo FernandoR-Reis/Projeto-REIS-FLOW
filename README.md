@@ -2,6 +2,10 @@
 
 Sistema front-end de gestão operacional para obras, clientes, orçamentos, financeiro, equipes e estoque.
 
+## Acesso online (domínio provisório)
+
+- Produção (GitHub Pages): https://fernandor-reis.github.io/Projeto-REIS-FLOW/
+
 ## Sobre o projeto
 
 O **REIS FLOW** é um painel administrativo construído com **HTML**, **CSS** e **JavaScript puro**, com foco em apresentar uma experiência moderna para controle operacional.
@@ -112,11 +116,11 @@ Este projeto pode ser usado como:
 - filtros funcionais
 - busca dinâmica
 - permissões por perfil de usuário
-- deploy em ambiente web
+- domínio personalizado (quando o domínio final estiver definido)
 
 ## Status do projeto
 
-Protótipo funcional de front-end.
+Protótipo funcional de front-end com deploy ativo no GitHub Pages.
 
 ## Licença
 
