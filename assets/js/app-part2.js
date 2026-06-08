@@ -159,9 +159,35 @@ function drawFluxo() {
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const icon = document.getElementById('sb-icon');
+  if (window.innerWidth <= 900) {
+    sidebar.classList.toggle('mobile-open');
+    document.body.classList.toggle('sidebar-open', sidebar.classList.contains('mobile-open'));
+    return;
+  }
+
   sidebar.classList.toggle('collapsed');
   icon.className = sidebar.classList.contains('collapsed') ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse';
 }
+
+function closeSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+
+  sidebar.classList.remove('mobile-open');
+  document.body.classList.remove('sidebar-open');
+}
+
+function syncSidebarMode() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+
+  if (window.innerWidth > 900) {
+    sidebar.classList.remove('mobile-open');
+    document.body.classList.remove('sidebar-open');
+  }
+}
+
+window.addEventListener('resize', syncSidebarMode);
 
 function setObrasView(mode, element) {
   document.querySelectorAll('#view-obras .tab-item').forEach((tab) => tab.classList.remove('active'));

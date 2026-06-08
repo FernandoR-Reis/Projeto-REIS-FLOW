@@ -219,6 +219,9 @@
         <input type="text" placeholder="Buscar obras, clientes, OS...">
       </div>
       <div class="topbar-actions">
+        <button class="icon-btn mobile-menu-btn" onclick="toggleSidebar()" title="Abrir menu" aria-label="Abrir menu">
+          <i class="ti ti-menu-2"></i>
+        </button>
         <button class="icon-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Alternar tema">
           <i class="ti ti-moon"></i>
         </button>
@@ -231,6 +234,8 @@
         <button class="icon-btn" onclick="logoutUser()" title="Sair"><i class="ti ti-logout"></i></button>
       </div>
     </div>
+
+    <div class="sidebar-overlay" onclick="closeSidebar()" aria-hidden="true"></div>
 
     <div class="content-area">
       <div class="view fade-in" id="view-dashboard">

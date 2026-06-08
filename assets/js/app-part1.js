@@ -305,6 +305,8 @@ function navigate(view, element) {
   }
   if (view === 'equipes') populateEquipes();
   if (view === 'estoque') populateEstoque();
+
+  if (window.innerWidth <= 900 && typeof closeSidebar === 'function') closeSidebar();
 }
 
 function populateObraDetail(code) {
