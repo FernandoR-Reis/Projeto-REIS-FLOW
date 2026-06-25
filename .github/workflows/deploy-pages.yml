@@ -29,6 +29,14 @@ jobs:
         with:
           enablement: true
 
+      - name: Create .nojekyll
+        run: touch .nojekyll
+
+      - name: Ensure root files are present
+        run: |
+          if [ ! -f index.html ]; then echo "index.html missing"; exit 1; fi
+          if [ ! -f assets/css/styles.css ]; then echo "styles.css missing"; exit 1; fi
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
