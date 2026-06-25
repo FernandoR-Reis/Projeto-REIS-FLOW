@@ -52,6 +52,6 @@ Se aparecer dados nessas tabelas, o banco foi criado com sucesso.
 
 Depois da configuracao, valide tambem no ambiente publicado:
 
-- https://fernandor-reis.github.io/Projeto-REIS-FLOW/
+- https://reisflow-provisorio.github.io/Projeto-REIS-FLOW/
 
 
