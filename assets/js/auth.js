@@ -494,8 +494,9 @@ async function recoverUser() {
   btn.disabled = true;
   btn.textContent = 'Enviando...';
 
+  const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
   const { error } = await db.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/index.html'
+    redirectTo: `${baseUrl}index.html`
   });
 
   btn.disabled = false;
