@@ -7,6 +7,17 @@
 window.addEventListener('DOMContentLoaded', async () => {
   setLoginLoading(false);
 
+  db.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      showResetPasswordForm();
+    }
+  });
+
+  if (isPasswordRecoveryFlow()) {
+    showResetPasswordForm();
+    return;
+  }
+
   if (isLocalAdminSession()) {
     goToApp('Administrador', 'admin');
     return;
@@ -17,6 +28,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     await abrirComPerfil(data.session.user);
   }
 });
+
+function isPasswordRecoveryFlow() {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search);
+  const type = (hash.get('type') || query.get('type') || '').toLowerCase();
+  const recoveryFlag = (query.get('recovery') || '').toLowerCase();
+
+  if (type === 'recovery') return true;
+  if (recoveryFlag === '1' || recoveryFlag === 'true') return true;
+
+  // Alguns fluxos do Supabase chegam sem type, mas com tokens de recuperação.
+  const hasHashTokens = Boolean(hash.get('access_token') || hash.get('refresh_token'));
+  const hasQueryTokens = Boolean(query.get('token_hash') || query.get('code'));
+
+  return hasHashTokens || hasQueryTokens;
+}
+
+function showResetPasswordForm() {
+  if (typeof switchLoginTab === 'function') {
+    switchLoginTab('reset', null);
+  }
+}
 
 function isLocalHost() {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -388,6 +421,72 @@ async function abrirComPerfil(user) {
   goToApp(nome, cargo);
 }
 
+function isEmailNotConfirmedError(error) {
+  if (!error) return false;
+
+  const code = String(error.code || '').toLowerCase();
+  const message = String(error.message || '').toLowerCase();
+
+  return code === 'email_not_confirmed'
+    || message.includes('email not confirmed')
+    || message.includes('not confirmed');
+}
+
+function getAuthErrorMessage(error, fallbackMessage) {
+  if (!error) return fallbackMessage;
+
+  const message = typeof error.message === 'string'
+    ? error.message.trim()
+    : '';
+
+  if (!message || message === '{}' || message === '[object Object]') {
+    return fallbackMessage;
+  }
+
+  return message;
+}
+
+function isServerAuthError(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  return status >= 500;
+}
+
+async function resendConfirmationEmail() {
+  const email = document.getElementById('login-email').value.trim();
+  const btn = document.getElementById('btn-resend-confirmation');
+
+  if (!email) {
+    showToast('Informe seu e-mail de login para reenviar a confirmacao.', 'warning');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Reenviando...';
+  }
+
+  const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+  const { error } = await db.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: `${baseUrl}index.html`
+    }
+  });
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Reenviar confirmacao de e-mail';
+  }
+
+  if (error) {
+    showToast(getAuthErrorMessage(error, 'Nao foi possivel reenviar a confirmacao. Tente novamente em alguns minutos.'), 'error');
+    return;
+  }
+
+  showToast('E-mail de confirmacao reenviado! Verifique sua caixa de entrada.', 'success');
+}
+
 // LOGIN — chamado quando o usuário clica em "Acessar o sistema"
 async function loginUser() {
   const email = document.getElementById('login-email').value.trim();
@@ -429,6 +528,18 @@ async function loginUser() {
   const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
 
   if (error) {
+    const errorMessage = String(error.message || '').toLowerCase();
+
+    if (isEmailNotConfirmedError(error)) {
+      showToast('Seu e-mail ainda nao foi confirmado. Verifique sua caixa de entrada.', 'warning');
+      return;
+    }
+
+    if (errorMessage.includes('invalid login credentials')) {
+      showToast('E-mail ou senha incorretos. Se acabou de cadastrar, confirme seu e-mail antes de entrar.', 'warning');
+      return;
+    }
+
     showToast('E-mail ou senha incorretos', 'error');
     return;
   }
@@ -460,22 +571,59 @@ async function registerUser() {
   btn.disabled = true;
   btn.textContent = 'Criando conta...';
 
-  const { data, error } = await db.auth.signUp({
-    email,
-    password: senha,
-    options: { data: { nome, empresa } }
-  });
+  let data = null;
+  let error = null;
+  const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+
+  try {
+    const response = await db.auth.signUp({
+      email,
+      password: senha,
+      options: {
+        data: { nome, empresa },
+        emailRedirectTo: `${baseUrl}index.html`
+      }
+    });
+
+    data = response.data;
+    error = response.error;
+  } catch (err) {
+    error = err;
+  }
 
   btn.disabled = false;
   btn.textContent = 'Criar conta grátis';
 
   if (error) {
-    showToast(error.message || 'Erro ao criar conta', 'error');
+    if (isServerAuthError(error)) {
+      showToast('Cadastro indisponivel no momento. Tente novamente em alguns minutos.', 'error');
+      return;
+    }
+
+    showToast(getAuthErrorMessage(error, 'Erro ao criar conta'), 'error');
     return;
   }
 
-  // O Supabase cria automaticamente um perfil via trigger (ou podemos criar aqui).
-  await db.from('profiles').upsert({ id: data.user.id, nome, cargo: 'operador' });
+  if (!data?.user?.id) {
+    showToast('Cadastro enviado, mas o Supabase nao retornou o usuario. Tente novamente.', 'warning');
+    return;
+  }
+
+  // So cria perfil quando existe sessao ativa; sem sessao, o RLS bloqueia o insert.
+  if (data.session?.access_token) {
+    const { error: profileError } = await db
+      .from('profiles')
+      .upsert({ id: data.user.id, nome, cargo: 'operador' });
+
+    if (profileError) {
+      showToast('Conta criada, mas houve erro ao criar perfil. Tente entrar novamente.', 'warning');
+      return;
+    }
+
+    await abrirComPerfil(data.user);
+    showToast('Conta criada com sucesso!', 'success');
+    return;
+  }
 
   showToast('Conta criada! Verifique seu e-mail para confirmar.', 'success');
   setTimeout(() => switchLoginTab('login', null), 2000);
@@ -496,18 +644,73 @@ async function recoverUser() {
 
   const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
   const { error } = await db.auth.resetPasswordForEmail(email, {
-    redirectTo: `${baseUrl}index.html`
+    redirectTo: `${baseUrl}index.html?recovery=1`
   });
 
   btn.disabled = false;
   btn.textContent = 'Enviar link de recuperação';
 
   if (error) {
-    showToast('Erro ao enviar e-mail', 'error');
+    showToast(getAuthErrorMessage(error, 'Erro ao enviar e-mail'), 'error');
     return;
   }
 
   showToast('Link enviado! Verifique sua caixa de entrada.', 'success');
+}
+
+async function updatePasswordUser() {
+  const senha = document.getElementById('reset-password').value;
+  const confirmar = document.getElementById('reset-password-confirm').value;
+  const btn = document.getElementById('btn-update-password');
+
+  if (!senha || !confirmar) {
+    showToast('Preencha os dois campos de senha.', 'warning');
+    return;
+  }
+
+  if (senha.length < 6) {
+    showToast('A senha precisa ter pelo menos 6 caracteres.', 'warning');
+    return;
+  }
+
+  if (senha !== confirmar) {
+    showToast('As senhas nao conferem.', 'warning');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  const { error } = await db.auth.updateUser({ password: senha });
+
+  btn.disabled = false;
+  btn.textContent = 'Salvar nova senha';
+
+  if (error) {
+    const rawMessage = String(error.message || '').toLowerCase();
+    const missingSession = rawMessage.includes('auth session missing')
+      || rawMessage.includes('invalid token')
+      || rawMessage.includes('jwt')
+      || rawMessage.includes('expired');
+
+    if (missingSession) {
+      showToast('Link de recuperacao invalido ou expirado. Solicite um novo e-mail de recuperacao.', 'warning');
+      return;
+    }
+
+    showToast(getAuthErrorMessage(error, 'Nao foi possivel redefinir a senha.'), 'error');
+    return;
+  }
+
+  await db.auth.signOut();
+
+  const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+  window.history.replaceState({}, document.title, cleanUrl);
+
+  document.getElementById('reset-password').value = '';
+  document.getElementById('reset-password-confirm').value = '';
+  switchLoginTab('login', null);
+  showToast('Senha redefinida com sucesso! Faça login com sua nova senha.', 'success');
 }
 
 // LOGOUT — chamado quando o usuário clica em "Sair"
