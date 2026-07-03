@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/styles.css?v=20260702">
 </head>
 <body>
 
@@ -68,6 +68,11 @@
           </div>
         </div>
         <div class="login-forgot"><a onclick="switchLoginTab('recover',null)">Esqueceu a senha?</a></div>
+        <p style="text-align:right;margin-top:6px;margin-bottom:0">
+          <button id="btn-resend-confirmation" type="button" onclick="resendConfirmationEmail()" style="background:none;border:none;color:var(--petrol-light);font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:2px">
+            Reenviar confirmação de e-mail
+          </button>
+        </p>
         <button id="btn-login" class="btn-login" type="submit">
           <i class="ti ti-arrow-right" style="margin-right:6px"></i>Acessar o sistema
         </button>
@@ -94,15 +99,38 @@
         <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input id="register-empresa" class="form-input" type="text" placeholder="Reis Obras e Serviços Ltda"></div></div>
         <div class="form-group"><label class="form-label">Telefone</label><div class="form-input-icon"><i class="ti ti-phone"></i><input class="form-input" type="tel" placeholder="(11) 99999-0000"></div></div>
         <div class="form-group"><label class="form-label">Senha</label><div class="form-input-icon"><i class="ti ti-lock"></i><input id="register-senha" class="form-input" type="password" placeholder="Mínimo 6 caracteres"></div></div>
-        <button id="btn-register" class="btn-login" onclick="registerUser()">Criar conta grátis</button>
+        <button id="btn-register" type="button" class="btn-login" onclick="registerUser()">Criar conta grátis</button>
       </div>
 
       <div id="recover-form" style="display:none">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.6">Informe seu e-mail e enviaremos um link para redefinir sua senha.</p>
         <div class="form-group"><label class="form-label">E-mail cadastrado</label><div class="form-input-icon"><i class="ti ti-mail"></i><input id="recover-email" class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
-        <button id="btn-recover" class="btn-login" onclick="recoverUser()">Enviar link de recuperação</button>
+        <button id="btn-recover" type="button" class="btn-login" onclick="recoverUser()">Enviar link de recuperação</button>
         <p style="text-align:center;margin-top:16px"><button onclick="switchLoginTab('login',null)" style="background:none;border:none;color:var(--petrol-light);font-size:13px;cursor:pointer">← Voltar ao login</button></p>
       </div>
+
+      <form id="reset-form" style="display:none" onsubmit="updatePasswordUser(); return false;">
+        <div class="reset-header">
+          <svg width="38" height="38" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+            <rect width="44" height="44" rx="12" fill="#1B4F6B"/>
+            <rect x="0.5" y="0.5" width="43" height="43" rx="11.5" stroke="rgba(255,255,255,0.15)"/>
+            <circle cx="11" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+            <circle cx="22" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+            <circle cx="33" cy="11" r="1.5" fill="rgba(255,255,255,0.2)"/>
+            <circle cx="11" cy="22" r="3.5" fill="#3AACDF"/>
+            <circle cx="33" cy="22" r="3.5" fill="#3AACDF"/>
+            <path d="M11 22 C11 16,22 16,22 22 C22 28,33 28,33 22" stroke="#3AACDF" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+          </svg>
+          <div class="reset-title">REIS <span>FLOW</span></div>
+        </div>
+
+        <div class="reset-inputs">
+          <div class="form-group"><div class="form-input-icon"><i class="ti ti-lock"></i><input id="reset-password" class="form-input" type="password" placeholder="Nova senha"></div></div>
+          <div class="form-group"><div class="form-input-icon"><i class="ti ti-lock-check"></i><input id="reset-password-confirm" class="form-input" type="password" placeholder="Confirmar nova senha"></div></div>
+        </div>
+
+        <button id="btn-update-password" type="submit" class="btn-login" style="margin-top:16px">Confirmar nova senha</button>
+      </form>
     </div>
   </div>
 
@@ -959,7 +987,7 @@
 <script src="assets/js/app-part1.js?v=20260531"></script>
 <script src="assets/js/app-part2.js?v=20260531"></script>
 <script src="assets/js/protection.js?v=20260531"></script>
-<script src="assets/js/auth.js?v=20260531"></script>
+<script src="assets/js/auth.js?v=20260708"></script>
 <script src="assets/js/crud.js?v=20260531"></script>
 </body>
 </html>

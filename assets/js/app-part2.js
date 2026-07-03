@@ -292,6 +292,11 @@ function calcTotals() {
 }
 
 function switchLoginTab(tab, button) {
+  const loginPage = document.getElementById('page-login');
+  if (loginPage) {
+    loginPage.classList.toggle('reset-mode', tab === 'reset');
+  }
+
   document.querySelectorAll('.login-tab').forEach((item) => item.classList.remove('active'));
 
   if (button) {
@@ -307,6 +312,10 @@ function switchLoginTab(tab, button) {
   document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
   document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
   document.getElementById('recover-form').style.display = tab === 'recover' ? 'block' : 'none';
+  const resetForm = document.getElementById('reset-form');
+  if (resetForm) {
+    resetForm.style.display = tab === 'reset' ? 'block' : 'none';
+  }
 }
 
 function goToApp(nome, cargo = 'operador') {

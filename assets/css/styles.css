@@ -248,6 +248,48 @@ body.privacy-guard::before{
 .login-forgot a{font-size:12px;color:var(--petrol-light);cursor:pointer}
 .login-forgot a:hover{text-decoration:underline}
 
+#page-login.reset-mode .login-brand{display:none}
+
+#page-login.reset-mode .login-container{
+  max-width:460px;
+  justify-content:center;
+  gap:0;
+}
+
+#page-login.reset-mode .login-card{
+  width:100%;
+  max-width:420px;
+  margin:0 auto;
+  padding:30px 28px;
+}
+
+#page-login.reset-mode .theme-switch,
+#page-login.reset-mode .login-tabs,
+#page-login.reset-mode #login-form,
+#page-login.reset-mode #register-form,
+#page-login.reset-mode #recover-form{display:none !important}
+
+#page-login.reset-mode #reset-form{display:block !important}
+
+.reset-header{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:28px;
+}
+
+.reset-title{
+  font-size:24px;
+  font-weight:800;
+  letter-spacing:-0.02em;
+  color:var(--text);
+}
+
+.reset-title span{color:var(--petrol-light)}
+
+.reset-inputs .form-group:last-child{margin-bottom:0}
+
 .login-loading{
   position:absolute;
   inset:0;

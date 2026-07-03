@@ -54,4 +54,24 @@ Depois da configuracao, valide tambem no ambiente publicado:
 
 - https://fernandor-reis.github.io/Projeto-REIS-FLOW/
 
+## 7) Template de recuperacao de senha (TASK-001)
+
+O template HTML pronto para uso esta em:
+
+- `supabase/templates/reset-password-email.html`
+
+Como aplicar no painel do Supabase:
+
+1. Acesse `Authentication`.
+2. Abra `Email Templates`.
+3. Entre em `Reset Password`.
+4. Cole o conteudo do arquivo `supabase/templates/reset-password-email.html`.
+5. Defina o assunto sugerido: `Redefina sua senha - Reis Flow`.
+6. Salve as alteracoes.
+
+Observacao importante:
+
+- O botao do template de recovery usa `{{ .ConfirmationURL }}` (padrao oficial do Supabase).
+- No front-end, o `redirectTo` do reset esta configurado para `index.html?recovery=1` como fallback.
+
 
