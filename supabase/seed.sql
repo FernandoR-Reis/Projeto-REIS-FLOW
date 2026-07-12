@@ -1,110 +1,94 @@
+-- =============================================================
+-- Seed operacional para validação do dashboard (DB-only)
+-- Regras:
+-- 1) 10 clientes
+-- 2) 2 orçamentos por cliente (20 total)
+-- 3) 4 obras para 5 clientes (20 total)
+-- + lançamentos a receber para alimentar indicadores
+-- =============================================================
+
+begin;
+
+delete from public.financeiro_receber;
+delete from public.equipe;
+delete from public.obras;
+delete from public.orcamento_itens;
+delete from public.orcamentos;
+delete from public.clientes;
+
+with clientes_seed as (
+  select
+    gs as idx,
+    format('Cliente Seed %s', lpad(gs::text, 2, '0')) as nome,
+    'CNPJ'::text as tipo_documento,
+    format('99.%06s/0001-%02s', (100000 + gs)::text, ((gs % 90) + 10)::text) as documento,
+    format('(11) 9%08s', (80000000 + gs)::text) as telefone,
+    'ativo'::text as status
+  from generate_series(1, 10) gs
+)
 insert into public.clientes (nome, tipo_documento, documento, telefone, status)
-values
-  ('Construtora Horizonte', 'CNPJ', '12.345.678/0001-00', '(11) 3847-2000', 'ativo'),
-  ('Grupo Inova Obras', 'CNPJ', '98.765.432/0001-11', '(11) 9847-3020', 'ativo'),
-  ('TechFix Soluções', 'CNPJ', '11.222.333/0001-44', '(11) 9234-5678', 'ativo'),
-  ('João Carlos Silva', 'CPF', '123.456.789-00', '(11) 99870-1234', 'ativo')
-on conflict (documento) do nothing;
+select nome, tipo_documento, documento, telefone, status
+from clientes_seed;
 
-insert into public.obras (codigo, nome, cliente_id, responsavel_nome, prazo, valor, status, localizacao)
-select
-  'OB-0031',
-  'Reforma Comercial Horizonte',
-  c.id,
-  'Diego Santos',
-  date '2025-06-28',
-  148000,
-  'andamento',
-  'São Paulo, SP'
-from public.clientes c
-where c.documento = '12.345.678/0001-00'
-on conflict (codigo) do nothing;
-
-insert into public.obras (codigo, nome, cliente_id, responsavel_nome, prazo, valor, status, localizacao)
-select
-  'OB-0030',
-  'Instalação Elétrica Inova',
-  c.id,
-  'Ana Moura',
-  date '2025-06-15',
-  87400,
-  'atrasada',
-  'Guarulhos, SP'
-from public.clientes c
-where c.documento = '98.765.432/0001-11'
-on conflict (codigo) do nothing;
-
+with base as (
+  select row_number() over(order by c.nome) as idx, c.id
+  from public.clientes c
+),
+orc_seed as (
+  select
+    b.id as cliente_id,
+    format('ORC-SD-%02s-%s', b.idx, n.n) as codigo,
+    format('Orçamento Seed %02s.%s', b.idx, n.n) as descricao,
+    (25000 + (b.idx * 3500) + (n.n * 1800))::numeric(14,2) as valor,
+    (22 + ((b.idx + n.n) % 14))::numeric(5,2) as margem_percentual,
+    date '2026-12-31' as validade,
+    case when n.n = 1 then 'pendente' else 'aprovado' end::text as status
+  from base b
+  cross join (values (1), (2)) as n(n)
+)
 insert into public.orcamentos (codigo, cliente_id, descricao, valor, margem_percentual, validade, status)
-select
-  'ORC-2847',
-  c.id,
-  'Reforma Elétrica Completa',
-  87200,
-  32,
-  date '2025-07-15',
-  'pendente'
-from public.clientes c
-where c.documento = '12.345.678/0001-00'
-on conflict (codigo) do nothing;
+select codigo, cliente_id, descricao, valor, margem_percentual, validade, status
+from orc_seed;
 
-insert into public.orcamentos (codigo, cliente_id, descricao, valor, margem_percentual, validade, status)
-select
-  'ORC-2846',
-  c.id,
-  'Instalação Hidráulica Industrial',
-  134500,
-  28,
-  date '2025-06-30',
-  'aprovado'
-from public.clientes c
-where c.documento = '98.765.432/0001-11'
-on conflict (codigo) do nothing;
+with base as (
+  select row_number() over(order by c.nome) as idx, c.id
+  from public.clientes c
+),
+obras_seed as (
+  select
+    b.id as cliente_id,
+    format('OB-SD-%02s-%s', b.idx, n.n) as codigo,
+    format('Obra Seed %02s.%s', b.idx, n.n) as nome,
+    (array['Diego Santos','Ana Moura','Pedro Lima','Luiz Henrique'])[n.n]::text as responsavel_nome,
+    make_date(2026, 7 + n.n, 15) as prazo,
+    (48000 + (b.idx * 9000) + (n.n * 3200))::numeric(14,2) as valor,
+    (array['andamento','atrasada','concluida','pausada'])[n.n]::text as status,
+    (array['São Paulo, SP','Guarulhos, SP','Campinas, SP','Osasco, SP'])[n.n]::text as localizacao
+  from base b
+  join (values (1), (2), (3), (4)) as n(n) on true
+  where b.idx <= 5
+)
+insert into public.obras (codigo, nome, cliente_id, responsavel_nome, prazo, valor, status, localizacao)
+select codigo, nome, cliente_id, responsavel_nome, prazo, valor, status, localizacao
+from obras_seed;
 
-insert into public.orcamento_itens (orcamento_id, descricao, quantidade, valor_unitario)
-select o.id, 'Cabeamento elétrico 2,5mm — 200m', 200, 2.40
-from public.orcamentos o
-where o.codigo = 'ORC-2847'
-and not exists (
-  select 1 from public.orcamento_itens i
-  where i.orcamento_id = o.id and i.descricao = 'Cabeamento elétrico 2,5mm — 200m'
-);
-
+with obras_base as (
+  select row_number() over(order by o.codigo) as idx, o.id, o.codigo, o.cliente_id
+  from public.obras o
+),
+rec_seed as (
+  select
+    format('REC-SD-%03s', idx) as referencia,
+    cliente_id,
+    id as obra_id,
+    format('Medição da %s', codigo) as descricao,
+    (12000 + (idx * 700))::numeric(14,2) as valor,
+    date '2026-10-10' as vencimento,
+    case when (idx % 3) = 0 then 'vencido' when (idx % 4) = 0 then 'recebido' else 'pendente' end::text as status
+  from obras_base
+)
 insert into public.financeiro_receber (referencia, cliente_id, obra_id, descricao, valor, vencimento, status)
-select
-  'REC-1201',
-  c.id,
-  o.id,
-  'Parcela 2 — Medição 1',
-  59200,
-  date '2025-06-10',
-  'vencido'
-from public.clientes c
-join public.obras o on o.codigo = 'OB-0031'
-where c.documento = '12.345.678/0001-00'
-on conflict (referencia) do nothing;
+select referencia, cliente_id, obra_id, descricao, valor, vencimento, status
+from rec_seed;
 
-insert into public.financeiro_pagar (referencia, fornecedor, categoria, valor, vencimento, status)
-values
-  ('PAG-0847', 'Hidrobom Materiais', 'Material', 18400, date '2025-06-13', 'vencido'),
-  ('PAG-0846', 'Elétrica Premium Ltda', 'Material', 24800, date '2025-06-20', 'pendente')
-on conflict (referencia) do nothing;
-
-insert into public.equipe (nome, funcao, diaria, comissao_percentual, obra_id, status)
-select
-  'Diego Santos',
-  'Mestre de Obras',
-  320,
-  3,
-  o.id,
-  'campo'
-from public.obras o
-where o.codigo = 'OB-0031'
-and not exists (
-  select 1 from public.equipe e where e.nome = 'Diego Santos'
-);
-
-insert into public.estoque_itens (codigo, nome, categoria, quantidade, minimo, custo_unitario, fornecedor)
-values
-  ('EST-001', 'Cabo PIAL 2,5mm', 'Elétrica', 480, 200, 2.40, 'Elétrica Premium'),
-  ('EST-002', 'Disjuntor 20A', 'Elétrica', 18, 30, 28.00, 'Elétrica Premium')
-on conflict (codigo) do nothing;
+commit;

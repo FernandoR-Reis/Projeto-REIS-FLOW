@@ -1,16 +1,6 @@
-const financRec = [
-  {ref:'REC-1201',client:'Construtora Horizonte',obra:'OB-0031',desc:'Parcela 2 — Medição 1',valor:'R$ 59.200',venc:'10/06/2025',status:'vencido'},
-  {ref:'REC-1200',client:'Grupo Inova',obra:'OB-0030',desc:'Sinal 30%',valor:'R$ 26.220',venc:'15/06/2025',status:'pendente'},
-  {ref:'REC-1199',client:'TechFix Soluções',obra:'OB-0029',desc:'Saldo final',valor:'R$ 34.200',venc:'30/06/2025',status:'pendente'},
-  {ref:'REC-1198',client:'Indústria ABC',obra:'OB-0027',desc:'Parcela 1 — 40%',valor:'R$ 86.000',venc:'20/07/2025',status:'futuro'},
-];
+const financRec = [];
 
-const financPag = [
-  {ref:'PAG-0847',forn:'Hidrobom Materiais',cat:'Material',valor:'R$ 18.400',venc:'13/06/2025',status:'vencido'},
-  {ref:'PAG-0846',forn:'Elétrica Premium Ltda',cat:'Material',valor:'R$ 24.800',venc:'20/06/2025',status:'pendente'},
-  {ref:'PAG-0845',forn:'Diego Santos',cat:'Mão de obra',valor:'R$ 9.600',venc:'30/06/2025',status:'pendente'},
-  {ref:'PAG-0844',forn:'Locação Equipamentos',cat:'Equipamento',valor:'R$ 3.200',venc:'30/06/2025',status:'pendente'},
-];
+const financPag = [];
 
 const equipeData = [
   {name:'Diego Santos',role:'Mestre de Obras',diaria:'R$ 320',comissao:'3%',obra:'OB-0031',status:'campo',initials:'DS',bg:'linear-gradient(135deg,#1B4F6B,#2176A3)'},
@@ -190,11 +180,16 @@ function syncSidebarMode() {
 window.addEventListener('resize', syncSidebarMode);
 
 function setObrasView(mode, element) {
+  window._obrasViewMode = mode;
   document.querySelectorAll('#view-obras .tab-item').forEach((tab) => tab.classList.remove('active'));
   element.classList.add('active');
   document.getElementById('obras-list').style.display = mode === 'list' ? 'block' : 'none';
   document.getElementById('obras-kanban').style.display = mode === 'kanban' ? 'flex' : 'none';
-  if (mode === 'kanban') populateObras();
+  if (typeof applyObrasFilters === 'function') {
+    applyObrasFilters();
+  } else if (mode === 'kanban') {
+    populateObras();
+  }
 }
 
 function setFinTab(tab, element) {
@@ -208,6 +203,11 @@ function setFinTab(tab, element) {
 }
 
 function openModal(id) {
+  if (id === 'modal-notifications') {
+    document.getElementById(id).classList.add('open');
+    return;
+  }
+
   if (typeof canAccessModal === 'function' && !canAccessModal(id)) {
     if (typeof showAccessDenied === 'function') {
       showAccessDenied(id.replace('modal-', '').replace(/-/g, ' '));
@@ -220,6 +220,12 @@ function openModal(id) {
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
+  if (id === 'modal-novo-cliente' && typeof resetClienteModalMode === 'function') {
+    resetClienteModalMode();
+  }
+  if (id === 'modal-novo-orc' && typeof resetOrcamentoModal === 'function') {
+    resetOrcamentoModal();
+  }
 }
 
 function showToast(message, type = 'success') {
@@ -251,13 +257,272 @@ function openQuickCreate() {
   openModal('modal-nova-obra');
 }
 
+function getImportantNotifications() {
+  const notifications = [];
+
+  obras.filter((obra) => obra.status === 'atrasada').forEach((obra) => {
+    notifications.push({
+      type: 'obra-atrasada',
+      severity: 'danger',
+      icon: 'ti-building-factory-2',
+      title: `${obra.code} atrasada`,
+      desc: `${obra.name} · ${obra.client} · prazo ${obra.prazo}`,
+      actionLabel: 'Abrir obra',
+      actionView: 'obras',
+      actionCode: obra.code
+    });
+  });
+
+  obras.filter((obra) => obra.status === 'pausada').forEach((obra) => {
+    notifications.push({
+      type: 'obra-problema',
+      severity: 'warning',
+      icon: 'ti-alert-triangle',
+      title: `${obra.code} com sinalização de problema`,
+      desc: `${obra.name} · ${obra.client} · status pausado`,
+      actionLabel: 'Ver obra',
+      actionView: 'obras',
+      actionCode: obra.code
+    });
+  });
+
+  financRec.filter((item) => item.status === 'vencido').forEach((item) => {
+    notifications.push({
+      type: 'receber-vencido',
+      severity: 'danger',
+      icon: 'ti-cash-banknote-off',
+      title: `Recebimento vencido ${item.ref}`,
+      desc: `${item.client} · ${item.obra} · ${item.desc} · ${item.valor}`,
+      actionLabel: 'Ir para financeiro',
+      actionView: 'financeiro',
+      actionTab: 'receber'
+    });
+  });
+
+  financPag.filter((item) => item.status === 'vencido').forEach((item) => {
+    notifications.push({
+      type: 'pagar-vencido',
+      severity: 'danger',
+      icon: 'ti-alert-circle',
+      title: `Pagamento em atraso ${item.ref}`,
+      desc: `${item.forn} · ${item.cat} · ${item.valor} · venc. ${item.venc}`,
+      actionLabel: 'Ir para financeiro',
+      actionView: 'financeiro',
+      actionTab: 'pagar'
+    });
+  });
+
+  estoqueData.filter((item) => item.qtd < item.min).forEach((item) => {
+    const deficit = item.min - item.qtd;
+    notifications.push({
+      type: 'estoque-baixo',
+      severity: 'warning',
+      icon: 'ti-package-import',
+      title: `Estoque baixo ${item.code}`,
+      desc: `${item.name} · faltam ${deficit} unidade(s) para o mínimo · fornecedor ${item.forn}`,
+      actionLabel: 'Abrir estoque',
+      actionView: 'estoque'
+    });
+  });
+
+  return notifications;
+}
+
+function refreshNotificationBadge() {
+  const badge = document.getElementById('notif-count');
+  const notifications = getImportantNotifications();
+
+  window._importantNotifications = notifications;
+
+  if (!badge) return notifications;
+
+  const count = notifications.length;
+  badge.textContent = String(count);
+  badge.style.display = count > 0 ? 'inline-flex' : 'none';
+
+  return notifications;
+}
+
+function openNotificationTarget(index) {
+  closeModal('modal-notifications');
+
+  const notification = window._importantNotifications?.[index];
+
+  if (!notification) return;
+
+  if (notification.actionView === 'obras' && notification.actionCode) {
+    navigate('obras', null);
+    setTimeout(() => openObraDetail(notification.actionCode), 80);
+    return;
+  }
+
+  if (notification.actionView === 'financeiro') {
+    navigate('financeiro', null);
+    setTimeout(() => {
+      const tab = document.querySelector(`#view-financeiro .tab-item[onclick*="setFinTab('${notification.actionTab}')"]`);
+      if (typeof setFinTab === 'function' && notification.actionTab) {
+        setFinTab(notification.actionTab, tab || document.querySelector('#view-financeiro .tab-item.active'));
+      }
+    }, 80);
+    return;
+  }
+
+  if (notification.actionView === 'estoque') {
+    navigate('estoque', null);
+  }
+}
+
+function renderNotificationPanel() {
+  const summary = document.getElementById('notification-summary');
+  const list = document.getElementById('notification-list');
+  const notifications = refreshNotificationBadge();
+
+  if (!summary || !list) return;
+
+  const counts = {
+    obras: notifications.filter((item) => item.type === 'obra-atrasada').length,
+    problemas: notifications.filter((item) => item.type === 'obra-problema').length,
+    financeiro: notifications.filter((item) => item.type === 'receber-vencido' || item.type === 'pagar-vencido').length,
+    estoque: notifications.filter((item) => item.type === 'estoque-baixo').length
+  };
+
+  summary.innerHTML = `
+    <div class="notification-summary-card">
+      <div class="notification-summary-label">Obras atrasadas</div>
+      <div class="notification-summary-value" style="color:var(--red)">${counts.obras}</div>
+      <div class="notification-summary-desc">Atrasos que exigem ação imediata</div>
+    </div>
+    <div class="notification-summary-card">
+      <div class="notification-summary-label">Problemas nas obras</div>
+      <div class="notification-summary-value" style="color:var(--orange)">${counts.problemas}</div>
+      <div class="notification-summary-desc">Obras pausadas ou com sinalização</div>
+    </div>
+    <div class="notification-summary-card">
+      <div class="notification-summary-label">Financeiro em atraso</div>
+      <div class="notification-summary-value" style="color:var(--petrol-light)">${counts.financeiro}</div>
+      <div class="notification-summary-desc">Recebimentos e pagamentos vencidos</div>
+    </div>
+    <div class="notification-summary-card">
+      <div class="notification-summary-label">Estoque baixo</div>
+      <div class="notification-summary-value" style="color:var(--green)">${counts.estoque}</div>
+      <div class="notification-summary-desc">Itens abaixo do mínimo</div>
+    </div>
+  `;
+
+  if (notifications.length === 0) {
+    list.innerHTML = '<div class="notification-item-empty">Nenhuma notificação crítica no momento.</div>';
+    return;
+  }
+
+  list.innerHTML = notifications.map((notification, index) => `
+    <button class="notification-item notification-item-${notification.severity}" type="button" onclick="openNotificationTarget(${index})">
+      <div class="notification-item-icon"><i class="ti ${notification.icon}"></i></div>
+      <div class="notification-item-body">
+        <div class="notification-item-top">
+          <div>
+            <div class="notification-item-title">${notification.title}</div>
+            <div class="notification-item-desc">${notification.desc}</div>
+          </div>
+          <span class="badge ${notification.severity === 'danger' ? 'badge-danger' : 'badge-warning'}"><span class="badge-dot"></span>${notification.actionLabel}</span>
+        </div>
+      </div>
+    </button>
+  `).join('');
+}
+
 function showNotifPanel() {
-  showToast('3 obras com prazo vencendo • 2 contas em atraso', 'warning');
+  renderNotificationPanel();
+  openModal('modal-notifications');
+}
+
+function clearViewRenderCache(view) {
+  const clearIds = {
+    dashboard: ['chart-fat', 'chart-labels'],
+    obras: ['obras-tbody', 'obras-kanban'],
+    orcamentos: ['orc-tbody', 'orc-preview-items'],
+    clientes: ['cli-tbody'],
+    financeiro: ['fin-rec-tbody', 'fin-pag-tbody', 'fluxo-svg'],
+    equipes: ['equipes-grid'],
+    estoque: ['estoque-tbody'],
+    'obra-detail': ['obra-detail-breadcrumb', 'obra-detail-code', 'obra-detail-name', 'obra-detail-client', 'obra-detail-resp', 'obra-detail-prazo', 'obra-detail-valor', 'obra-detail-status']
+  };
+
+  (clearIds[view] || []).forEach((id) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.tagName === 'SELECT') {
+      element.value = '';
+    } else {
+      element.innerHTML = '';
+    }
+  });
+}
+
+async function refreshCurrentView() {
+  const refreshBtn = document.getElementById('btn-refresh');
+  const currentView = window._currentView || 'dashboard';
+
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.style.opacity = '0.7';
+  }
+
+  try {
+    if (typeof loadAllData === 'function') {
+      await loadAllData();
+    }
+
+    if (currentView === 'dashboard') {
+      clearViewRenderCache('dashboard');
+      if (typeof buildDashChart === 'function') buildDashChart();
+    } else if (currentView === 'obras') {
+      clearViewRenderCache('obras');
+      if (typeof populateObras === 'function') populateObras();
+    } else if (currentView === 'orcamentos') {
+      clearViewRenderCache('orcamentos');
+      if (typeof populateOrc === 'function') populateOrc();
+      if (typeof populateOrcPreview === 'function') populateOrcPreview();
+    } else if (currentView === 'clientes') {
+      clearViewRenderCache('clientes');
+      if (typeof populateClientes === 'function') populateClientes();
+    } else if (currentView === 'financeiro') {
+      clearViewRenderCache('financeiro');
+      if (typeof populateFin === 'function') populateFin();
+      if (typeof drawFluxo === 'function') drawFluxo();
+    } else if (currentView === 'equipes') {
+      clearViewRenderCache('equipes');
+      if (typeof populateEquipes === 'function') populateEquipes();
+    } else if (currentView === 'estoque') {
+      clearViewRenderCache('estoque');
+      if (typeof populateEstoque === 'function') populateEstoque();
+    } else if (currentView === 'obra-detail') {
+      clearViewRenderCache('obra-detail');
+      if (typeof openObraDetail === 'function' && window._currentObraCode) {
+        openObraDetail(window._currentObraCode);
+      }
+    }
+
+    if (typeof refreshNotificationBadge === 'function') {
+      refreshNotificationBadge();
+    }
+
+    showToast('Tela atualizada', 'success');
+  } catch (error) {
+    console.error('Erro ao atualizar a tela', error);
+    showToast('Falha ao atualizar a tela', 'error');
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.style.opacity = '';
+    }
+  }
 }
 
 function addOrcLine() {
   const container = document.getElementById('orc-modal-lines');
-  container.innerHTML += `<div class="budget-line"><input placeholder="Serviço / Material"><input value="1" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="0" placeholder="R$ 0,00" oninput="calcLine(this)"><span class="line-total" style="text-align:right;font-weight:600;color:var(--petrol-light)">R$ 0</span><button onclick="this.parentElement.remove();calcTotals()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px"><i class="ti ti-x"></i></button></div>`;
+  if (!container) return;
+  container.insertAdjacentHTML('beforeend', `<div class="budget-line"><input placeholder="Serviço / Material"><input value="1" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="0" placeholder="R$ 0,00" oninput="calcLine(this)"><span class="line-total" style="text-align:right;font-weight:600;color:var(--petrol-light)">R$ 0</span><button onclick="this.parentElement.remove();calcTotals()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px"><i class="ti ti-x"></i></button></div>`);
 }
 
 function calcLine(input) {
@@ -347,6 +612,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   if (typeof applyRolePermissions === 'function') applyRolePermissions();
+  refreshNotificationBadge();
 
   calcTotals();
 

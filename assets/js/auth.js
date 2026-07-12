@@ -18,13 +18,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  if (isLocalAdminSession()) {
+  // Evita cair no modo demo sem querer no localhost.
+  if (!isLocalDemoEnabled()) {
+    setLocalAdminSession(false);
+  }
+
+  if (isLocalDemoEnabled() && isLocalAdminSession()) {
     goToApp('Administrador', 'admin');
     return;
   }
 
   const { data } = await db.auth.getSession();
   if (data.session) {
+    clearAuthCallbackParams();
     await abrirComPerfil(data.session.user);
   }
 });
@@ -38,11 +44,24 @@ function isPasswordRecoveryFlow() {
   if (type === 'recovery') return true;
   if (recoveryFlag === '1' || recoveryFlag === 'true') return true;
 
-  // Alguns fluxos do Supabase chegam sem type, mas com tokens de recuperação.
-  const hasHashTokens = Boolean(hash.get('access_token') || hash.get('refresh_token'));
-  const hasQueryTokens = Boolean(query.get('token_hash') || query.get('code'));
+  return false;
+}
 
-  return hasHashTokens || hasQueryTokens;
+function clearAuthCallbackParams() {
+  const url = new URL(window.location.href);
+  const query = url.searchParams;
+
+  // Mantem apenas flags locais úteis e remove parâmetros transitórios do OAuth.
+  const keepLocalDemo = query.get('localdemo');
+  const keepRecovery = query.get('recovery');
+
+  url.search = '';
+  if (keepLocalDemo === '1') url.searchParams.set('localdemo', '1');
+  if (keepRecovery === '1' || keepRecovery === 'true') url.searchParams.set('recovery', keepRecovery);
+  url.hash = '';
+
+  const cleanUrl = `${url.origin}${url.pathname}${url.search}`;
+  window.history.replaceState({}, document.title, cleanUrl);
 }
 
 function showResetPasswordForm() {
@@ -55,6 +74,11 @@ function isLocalHost() {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
 }
 
+function isLocalDemoEnabled() {
+  const query = new URLSearchParams(window.location.search);
+  return isLocalHost() && query.get('localdemo') === '1';
+}
+
 function isLocalAdminSession() {
   return sessionStorage.getItem('reisflow_admin_local') === '1';
 }
@@ -64,6 +88,20 @@ function setLocalAdminSession(active) {
     sessionStorage.setItem('reisflow_admin_local', '1');
   } else {
     sessionStorage.removeItem('reisflow_admin_local');
+  }
+}
+
+async function loginWithOAuth(provider) {
+  const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
+  const redirectTo = `${baseUrl}index.html`;
+
+  const { error } = await db.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo }
+  });
+
+  if (error) {
+    showToast(getAuthErrorMessage(error, 'Nao foi possivel iniciar o login social.'), 'error');
   }
 }
 
@@ -520,8 +558,14 @@ async function loginUser() {
       return;
     }
 
-    setLocalAdminSession(true);
-    goToApp('Administrador', 'admin');
+    if (isLocalDemoEnabled()) {
+      setLocalAdminSession(true);
+      showToast('Modo demo local ativo: dados reais do banco nao serao exibidos.', 'warning');
+      goToApp('Administrador', 'admin');
+      return;
+    }
+
+    showToast('Credenciais demo locais nao autenticam no banco. Entre com GitHub ou e-mail/senha do Supabase.', 'warning');
     return;
   }
 
