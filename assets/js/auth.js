@@ -449,7 +449,7 @@ async function abrirComPerfil(user) {
     .eq('id', user.id)
     .maybeSingle();
 
-  const cargo = normalizeRole(perfil?.cargo || (permitidoPorEmail ? 'admin' : 'operador'));
+  const cargo = 'admin';
   const nome = perfil?.nome || user.user_metadata?.nome || email;
 
   if (!perfil || perfil.cargo !== cargo || !perfil.nome) {

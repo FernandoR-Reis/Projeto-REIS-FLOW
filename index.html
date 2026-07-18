@@ -217,7 +217,7 @@
       <div class="nav-item" onclick="navigate('obras',this)"><i class="ti ti-building-factory-2"></i><span class="label">Obras</span><span class="nav-badge">3</span></div>
       <div class="nav-section-label">Operacional</div>
       <div class="nav-item" onclick="navigate('financeiro',this)"><i class="ti ti-cash"></i><span class="label">Financeiro</span></div>
-      <div class="nav-item" onclick="navigate('equipes',this)"><i class="ti ti-hard-hat"></i><span class="label">Equipes</span></div>
+      <div class="nav-item" onclick="navigate('equipes',this)"><i class="ti ti-users-group"></i><span class="label">Equipes</span></div>
       <div class="nav-item" onclick="navigate('estoque',this)"><i class="ti ti-packages"></i><span class="label">Estoque</span></div>
       <div class="nav-section-label">Sistema</div>
       <div class="nav-item" onclick="navigate('configuracoes',this)"><i class="ti ti-settings"></i><span class="label">Configurações</span></div>
@@ -427,6 +427,7 @@
           <select id="obras-filter-status" class="filter-select" onchange="applyObrasFilters()"><option>Todos os status</option><option>Em andamento</option><option>Orçamento</option><option>Atrasada</option><option>Finalizada</option></select>
           <select id="obras-filter-resp" class="filter-select" onchange="applyObrasFilters()"><option>Todos os responsáveis</option><option>Diego Santos</option><option>Ana Moura</option><option>Pedro Lima</option></select>
           <select id="obras-filter-prioridade" class="filter-select" onchange="applyObrasFilters()"><option>Prioridade</option><option>Alta</option><option>Média</option><option>Baixa</option></select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearObrasFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div id="obras-list">
@@ -456,7 +457,7 @@
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <span class="badge badge-info" id="obra-detail-status"><span class="badge-dot"></span>Em andamento</span>
-            <button class="btn btn-secondary btn-sm"><i class="ti ti-edit"></i>Editar</button>
+            <button class="btn btn-secondary btn-sm" onclick="openObraEdit(document.getElementById('obra-detail-code').textContent)"><i class="ti ti-edit"></i>Editar</button>
             <button class="btn btn-secondary btn-sm"><i class="ti ti-file-export"></i>Relatório</button>
           </div>
         </div>
@@ -473,59 +474,33 @@
             <div class="info-item"><div class="lbl">Margem</div><div class="val green">33,8%</div></div>
           </div>
           <div style="margin-top:10px">
-            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Progresso geral</span><span style="color:var(--petrol-light);font-weight:600">62%</span></div>
-            <div class="progress" style="height:6px"><div class="progress-fill" style="width:62%;background:var(--petrol-light)"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Progresso geral</span><span id="obra-progress-value" style="color:var(--petrol-light);font-weight:600">0%</span></div>
+            <div class="progress" style="height:6px"><div class="progress-fill" id="obra-progress-fill" style="width:0%;background:var(--petrol-light)"></div></div>
+            <div id="obra-progress-meta" style="margin-top:6px;font-size:11px;color:var(--text-muted)">Regra: etapas 70% + prazo 20% + marcos 10%.</div>
           </div>
         </div>
 
         <div class="grid-2" style="margin-bottom:16px">
           <div class="card">
-            <div class="section-hdr"><h3><i class="ti ti-list-check" style="font-size:14px;color:var(--petrol-light)"></i> Etapas da Obra</h3><button onclick="showToast('Etapa adicionada','success')"><i class="ti ti-plus"></i> Adicionar</button></div>
-            <div class="checklist">
-              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Levantamento e vistoria</span></div>
-              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Projeto aprovado pelo cliente</span></div>
-              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Demolição área interna</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Elétrica — fase 1 (70% concluído)</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Hidráulica e instalações</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Acabamento e pintura</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Vistoria final e entrega</span></div>
-            </div>
+            <div class="section-hdr"><h3><i class="ti ti-list-check" style="font-size:14px;color:var(--petrol-light)"></i> Etapas da Obra</h3><button onclick="openEtapasEditor()"><i class="ti ti-list-details"></i> Ver completo</button></div>
+            <div class="checklist" id="obra-etapas-checklist"></div>
+            <div id="obra-etapas-meta" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
           </div>
 
           <div class="card">
-            <div class="section-hdr"><h3><i class="ti ti-timeline" style="font-size:14px;color:var(--petrol-light)"></i> Histórico</h3></div>
-            <div class="timeline">
-              <div class="timeline-item">
-                <div class="tl-dot" style="background:var(--blue-bg);color:var(--petrol-light)"><i class="ti ti-camera" style="font-size:12px"></i></div>
-                <div class="tl-line"></div>
-                <div class="tl-content"><div class="tl-title">Fotos enviadas — fase elétrica</div><div class="tl-desc">Diego Santos enviou 8 fotos do progresso</div><div class="tl-date">Hoje, 14:22</div></div>
-              </div>
-              <div class="timeline-item">
-                <div class="tl-dot" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-check" style="font-size:12px"></i></div>
-                <div class="tl-line"></div>
-                <div class="tl-content"><div class="tl-title">Etapa demolição concluída</div><div class="tl-desc">Marcada como finalizada por Diego Santos</div><div class="tl-date">12/06, 09:10</div></div>
-              </div>
-              <div class="timeline-item">
-                <div class="tl-dot" style="background:var(--orange-bg);color:var(--orange)"><i class="ti ti-alert-triangle" style="font-size:12px"></i></div>
-                <div class="tl-line"></div>
-                <div class="tl-content"><div class="tl-title">Alerta de prazo</div><div class="tl-desc">Obra 16 dias do vencimento</div><div class="tl-date">10/06, 08:00</div></div>
-              </div>
-              <div class="timeline-item">
-                <div class="tl-dot" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-currency-dollar" style="font-size:12px"></i></div>
-                <div class="tl-line"></div>
-                <div class="tl-content"><div class="tl-title">Parcela recebida — R$ 44.400</div><div class="tl-desc">30% do contrato — pago pelo cliente</div><div class="tl-date">03/06, 16:45</div></div>
-              </div>
-            </div>
+            <div class="section-hdr"><h3><i class="ti ti-timeline" style="font-size:14px;color:var(--petrol-light)"></i> Histórico</h3><button id="obra-history-toggle-btn" onclick="openObraHistoryModal()" style="display:none">Ver completo</button></div>
+            <div class="timeline" id="obra-history-timeline"></div>
+            <div id="obra-history-meta" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
           </div>
         </div>
 
         <div class="card" style="margin-bottom:16px">
-          <div class="section-hdr"><h3><i class="ti ti-photo" style="font-size:14px;color:var(--petrol-light)"></i> Galeria de Fotos</h3><button onclick="showToast('Abrir câmera / upload','info')"><i class="ti ti-upload"></i> Adicionar</button></div>
+          <div class="section-hdr"><h3><i class="ti ti-photo" style="font-size:14px;color:var(--petrol-light)"></i> Galeria de Fotos</h3><button onclick="registrarUploadFotoObra()"><i class="ti ti-upload"></i> Adicionar</button></div>
           <div class="photo-grid">
             <div class="photo-item" style="background:linear-gradient(135deg,rgba(27,79,107,0.4),rgba(33,118,163,0.2))"><i class="ti ti-building-community" style="font-size:28px;color:var(--petrol-light)"></i></div>
             <div class="photo-item" style="background:linear-gradient(135deg,rgba(45,212,160,0.1),rgba(27,79,107,0.3))"><i class="ti ti-bolt" style="font-size:28px;color:var(--green)"></i></div>
             <div class="photo-item" style="background:linear-gradient(135deg,rgba(245,149,51,0.1),rgba(33,37,47,0.5))"><i class="ti ti-tools" style="font-size:28px;color:var(--orange)"></i></div>
-            <div class="photo-item add" onclick="showToast('Upload de foto','info')"><i class="ti ti-plus"></i></div>
+            <div class="photo-item add" onclick="registrarUploadFotoObra()"><i class="ti ti-plus"></i></div>
           </div>
         </div>
 
@@ -557,8 +532,9 @@
         </div>
 
         <div class="filters-bar">
-          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar orçamento..."></div>
-          <select class="filter-select"><option>Todos</option><option>Pendente</option><option>Aprovado</option><option>Reprovado</option><option>Expirado</option></select>
+          <div class="filter-input"><i class="ti ti-search"></i><input id="orc-search" type="text" placeholder="Buscar orçamento..." oninput="applyOrcamentosFilters()"></div>
+          <select id="orc-filter-status" class="filter-select" onchange="applyOrcamentosFilters()"><option value="todos">Todos</option><option value="pendente">Pendente</option><option value="aprovado">Aprovado</option><option value="reprovado">Reprovado</option><option value="expirado">Expirado</option></select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearOrcamentosFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div class="table-wrap" style="margin-bottom:20px">
@@ -631,6 +607,7 @@
           <div class="filter-input"><i class="ti ti-search"></i><input id="clientes-search" type="text" placeholder="Nome, documento ou telefone..." oninput="applyClientesFilters()"></div>
           <select id="clientes-filter-tipo" class="filter-select" onchange="applyClientesFilters()"><option value="todos">Todos</option><option value="CNPJ">CNPJ</option><option value="CPF">CPF</option></select>
           <select id="clientes-filter-status" class="filter-select" onchange="applyClientesFilters()"><option value="todos">Todos os status</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearClientesFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div class="table-wrap">
@@ -656,26 +633,26 @@
         <div class="stats-grid" style="margin-bottom:20px">
           <div class="stat-card" style="--accent:var(--green)">
             <div class="stat-label">Total a Receber</div>
-            <div class="stat-value" style="color:var(--green)">R$168k</div>
-            <div class="stat-sub">12 parcelas em aberto</div>
+            <div class="stat-value" id="fin-stat-receber" style="color:var(--green)">R$ 0</div>
+            <div class="stat-sub" id="fin-stat-receber-sub">0 parcelas em aberto</div>
             <i class="ti ti-arrow-down-circle stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--red)">
             <div class="stat-label">Total a Pagar</div>
-            <div class="stat-value" style="color:var(--red)">R$87k</div>
-            <div class="stat-sub"><span class="down">R$43k</span> vence em 7 dias</div>
+            <div class="stat-value" id="fin-stat-pagar" style="color:var(--red)">R$ 0</div>
+            <div class="stat-sub" id="fin-stat-pagar-sub"><span class="down">R$ 0</span> vence em 7 dias</div>
             <i class="ti ti-arrow-up-circle stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--petrol-light)">
             <div class="stat-label">Saldo Previsto</div>
-            <div class="stat-value" style="color:var(--petrol-light)">R$81k</div>
-            <div class="stat-sub">Mês de junho</div>
+            <div class="stat-value" id="fin-stat-saldo" style="color:var(--petrol-light)">R$ 0</div>
+            <div class="stat-sub" id="fin-stat-saldo-sub">Mês atual</div>
             <i class="ti ti-wallet stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:#A76EF6">
             <div class="stat-label">Faturado no Mês</div>
-            <div class="stat-value" style="color:#A76EF6">R$287k</div>
-            <div class="stat-sub"><span class="up">↑ 18%</span> vs maio</div>
+            <div class="stat-value" id="fin-stat-faturado" style="color:#A76EF6">R$ 0</div>
+            <div class="stat-sub" id="fin-stat-faturado-sub">Receitas quitadas no mês</div>
             <i class="ti ti-chart-bar stat-icon"></i>
           </div>
         </div>
@@ -684,6 +661,25 @@
           <button class="tab-item active" onclick="setFinTab('receber',this)">A Receber</button>
           <button class="tab-item" onclick="setFinTab('pagar',this)">A Pagar</button>
           <button class="tab-item" onclick="setFinTab('fluxo',this)">Fluxo de Caixa</button>
+        </div>
+
+        <div class="filters-bar" id="fin-filters-bar" style="margin-bottom:14px">
+          <div class="filter-input"><i class="ti ti-search"></i><input id="fin-filter-search" type="text" placeholder="Buscar por referência, descrição, cliente, fornecedor..." oninput="onFinFiltersChange()"></div>
+          <select id="fin-filter-status" class="filter-select" onchange="onFinFiltersChange()">
+            <option value="todos">Todos os status</option>
+            <option value="pendente">Pendente</option>
+            <option value="vencido">Vencido</option>
+            <option value="futuro">Futuro</option>
+            <option value="quitado">Quitado</option>
+          </select>
+          <select id="fin-filter-period" class="filter-select" onchange="onFinFiltersChange()">
+            <option value="todos">Todo período</option>
+            <option value="hoje">Vence hoje</option>
+            <option value="7d">Vence em 7 dias</option>
+            <option value="30d">Vence em 30 dias</option>
+            <option value="atrasado">Atrasados</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearFinFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div id="fin-receber">
@@ -706,7 +702,18 @@
 
         <div id="fin-fluxo" style="display:none">
           <div class="card">
-            <div class="section-hdr"><h3>Fluxo de Caixa — Junho 2025</h3></div>
+            <div class="section-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <h3 id="fin-flow-title">Fluxo de Caixa</h3>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <select id="fin-flow-period" class="filter-select" onchange="onFinFlowPeriodChange()">
+                  <option value="7d">Próximos 7 dias</option>
+                  <option value="15d">Próximos 15 dias</option>
+                  <option value="30d" selected>Próximos 30 dias</option>
+                  <option value="anual">Anual</option>
+                </select>
+                <span id="fin-flow-meta" style="font-size:11px;color:var(--text-muted)">Calculado a partir dos lançamentos reais</span>
+              </div>
+            </div>
             <div style="height:200px;position:relative;margin:10px 0" id="fluxo-chart-wrap">
               <svg viewBox="0 0 660 180" width="100%" height="100%" id="fluxo-svg"></svg>
             </div>
@@ -730,10 +737,31 @@
           </div>
         </div>
 
-        <div class="filters-bar">
-          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar por nome, função..."></div>
-          <select class="filter-select"><option>Todas as funções</option><option>Eletricista</option><option>Encanador</option><option>Pedreiro</option><option>Mestre de Obras</option></select>
-          <select class="filter-select"><option>Todos os status</option><option>Em campo</option><option>Disponível</option><option>Afastado</option></select>
+        <div class="filters-bar" id="equipes-filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input id="equipes-filter-search" type="text" placeholder="Buscar por nome, função, área..." oninput="onEquipesFiltersChange()"></div>
+          <select id="equipes-filter-area" class="filter-select" onchange="onEquipesFiltersChange()">
+            <option value="todos">Todas as áreas</option>
+            <option value="obras">Obras</option>
+            <option value="eletrica">Elétrica</option>
+            <option value="hidraulica">Hidráulica</option>
+            <option value="civil">Civil</option>
+            <option value="administrativo">Administrativo</option>
+          </select>
+          <select id="equipes-filter-role" class="filter-select" onchange="onEquipesFiltersChange()">
+            <option value="todos">Todas as funções</option>
+            <option value="eletricista">Eletricista</option>
+            <option value="encanador">Encanador</option>
+            <option value="pedreiro">Pedreiro</option>
+            <option value="mestre de obras">Mestre de Obras</option>
+            <option value="ajudante">Ajudante</option>
+          </select>
+          <select id="equipes-filter-status" class="filter-select" onchange="onEquipesFiltersChange()">
+            <option value="todos">Todos os status</option>
+            <option value="campo">Em campo</option>
+            <option value="disponivel">Disponível</option>
+            <option value="afastado">Afastado</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearEquipesFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div id="equipes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px"></div>
@@ -839,12 +867,77 @@
   </main>
 </div>
 
+<div class="modal-overlay" id="modal-historico-obra">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-timeline" style="margin-right:8px;color:var(--petrol-light)"></i>Histórico Completo da Obra <span id="obra-history-modal-code" style="color:var(--text-muted)"></span></div>
+      <button class="modal-close" onclick="closeModal('modal-historico-obra')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row" style="margin-bottom:8px">
+      <div class="field" style="margin-bottom:0">
+        <label>Tipo de evento</label>
+        <select id="obra-history-filter-type" onchange="onObraHistoryFilterChange()">
+          <option value="todos">Todos</option>
+          <option value="etapa_concluida">Etapa concluída</option>
+          <option value="etapa_reaberta">Etapa reaberta</option>
+          <option value="etapa_adicionada">Etapa adicionada</option>
+          <option value="etapa_editada">Etapa editada</option>
+          <option value="etapa_excluida">Etapa excluída</option>
+          <option value="obra_editada">Obra editada</option>
+          <option value="foto_upload">Upload de foto</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Período</label>
+        <select id="obra-history-filter-period" onchange="onObraHistoryFilterChange()">
+          <option value="todos">Todo período</option>
+          <option value="hoje">Hoje</option>
+          <option value="7d">Últimos 7 dias</option>
+          <option value="30d">Últimos 30 dias</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:10px">
+      <label>Buscar no histórico</label>
+      <input id="obra-history-filter-search" placeholder="Buscar por título ou descrição" oninput="onObraHistoryFilterChange()">
+    </div>
+    <div class="timeline" id="obra-history-full-timeline"></div>
+    <div id="obra-history-full-meta" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-historico-obra')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-etapas-obra">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-list-check" style="margin-right:8px;color:var(--petrol-light)"></i>Gerenciar Etapas da Obra</div>
+      <button class="modal-close" onclick="closeModal('modal-etapas-obra')"><i class="ti ti-x"></i></button>
+    </div>
+    <input id="etapas-editor-obra-code" type="hidden" value="">
+    <div class="field" style="margin-bottom:8px">
+      <label>Etapas cadastradas</label>
+      <div id="etapas-editor-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-start;margin-bottom:8px">
+      <button class="btn btn-secondary btn-sm" onclick="addEtapaEditorRow()"><i class="ti ti-plus"></i>Adicionar etapa</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-etapas-obra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="applyEtapasEditor()"><i class="ti ti-device-floppy"></i>Salvar etapas</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-nova-obra">
   <div class="modal modal-lg">
     <div class="modal-header">
       <div class="modal-title"><i class="ti ti-building-factory-2" style="margin-right:8px;color:var(--petrol-light)"></i>Nova Obra</div>
       <button class="modal-close" onclick="closeModal('modal-nova-obra')"><i class="ti ti-x"></i></button>
     </div>
+    <input id="obra-edit-id" type="hidden" value="">
+    <input id="obra-edit-client-id" type="hidden" value="">
     <div class="field-row"><div class="field"><label>Código (auto)</label><input id="obra-codigo" value="OB-0032" disabled style="opacity:0.5"></div><div class="field"><label>Título da Obra</label><input id="obra-nome" placeholder="Ex: Reforma elétrica completa"></div></div>
     <div class="field-row"><div class="field"><label>Orçamento (obrigatório)</label><select id="obra-orcamento-id" onchange="onObraOrcamentoChange()"><option value="">Selecione um orçamento</option></select></div><div class="field"><label>Cliente (a partir do orçamento)</label><input id="obra-cliente-nome" placeholder="Selecione um orçamento" disabled style="opacity:0.65"></div></div>
     <div class="field-row"><div class="field"><label>Responsável</label><input id="obra-responsavel" placeholder="Nome do responsável"></div><div class="field"><label>Valor da proposta</label><input id="obra-valor" placeholder="R$ 0,00" type="text"></div></div>
@@ -854,7 +947,7 @@
     <div class="field"><label>Observações</label><textarea placeholder="Descrição do escopo, condições especiais..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-nova-obra')">Cancelar</button>
-      <button class="btn btn-primary" onclick="salvarObra()"><i class="ti ti-check"></i>Criar Obra</button>
+      <button class="btn btn-primary" id="btn-salvar-obra" onclick="salvarObra()"><i class="ti ti-check"></i>Criar Obra</button>
     </div>
   </div>
 </div>
@@ -920,6 +1013,7 @@
       <div class="info-item"><div class="lbl">Validade</div><div class="val" id="orc-detail-validade">-</div></div>
       <div class="info-item"><div class="lbl">Status</div><div class="val" id="orc-detail-status">-</div></div>
     </div>
+    <input id="orc-detail-status-value" type="hidden" value="">
     <div class="field" style="margin-bottom:12px"><label>Descrição</label><div id="orc-detail-desc" style="font-size:13px;color:var(--text)">-</div></div>
     <div class="table-wrap" style="margin-top:8px">
       <table>
@@ -929,6 +1023,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-orc-detalhe')">Fechar</button>
+      <button class="btn btn-secondary" id="btn-toggle-orc-status" onclick="toggleOrcamentoStatus()"><i class="ti ti-toggle-right"></i>Alterar status</button>
       <button class="btn btn-secondary" onclick="gerarPdfOrcamento(document.getElementById('orc-detail-id').value)"><i class="ti ti-file-type-pdf"></i>Gerar PDF</button>
       <button class="btn btn-primary" onclick="enviarOrcamento(document.getElementById('orc-detail-id').value)"><i class="ti ti-send"></i>Enviar</button>
     </div>
@@ -975,6 +1070,8 @@
       <div class="modal-title"><i class="ti ti-user" style="margin-right:8px;color:var(--petrol-light)"></i>Detalhes do Cliente</div>
       <button class="modal-close" onclick="closeModal('modal-cliente-detalhe')"><i class="ti ti-x"></i></button>
     </div>
+    <input id="cliente-detail-doc-value" type="hidden" value="">
+    <input id="cliente-detail-status-value" type="hidden" value="">
     <div class="info-grid">
       <div class="info-item"><div class="lbl">Nome</div><div class="val" id="cliente-detail-nome">-</div></div>
       <div class="info-item"><div class="lbl">Tipo</div><div class="val" id="cliente-detail-tipo">-</div></div>
@@ -1022,6 +1119,7 @@
       </div>
     </div>
     <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-toggle-cliente-status-detail" onclick="toggleClienteStatus('detail')"><i class="ti ti-user-x"></i>Alterar status</button>
       <button class="btn btn-secondary" onclick="closeModal('modal-cliente-detalhe');navigate('dashboard',null)"><i class="ti ti-layout-dashboard"></i>Ir para Dashboard</button>
       <button class="btn btn-ghost" onclick="closeModal('modal-cliente-detalhe')">Fechar</button>
     </div>
@@ -1031,17 +1129,21 @@
 <div class="modal-overlay" id="modal-lancamento">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title"><i class="ti ti-cash" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Lançamento</div>
+      <div class="modal-title" id="fin-modal-title"><i class="ti ti-cash" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Lançamento</div>
       <button class="modal-close" onclick="closeModal('modal-lancamento')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field"><label>Tipo</label><select><option>A Receber</option><option>A Pagar</option></select></div>
-    <div class="field"><label>Cliente</label><select id="fin-cliente-id"><option value="">Carregando...</option></select></div>
-    <div class="field-row"><div class="field"><label>Descrição</label><input placeholder="Ex: Parcela 2/3 — OB-0031"></div><div class="field"><label>Valor</label><input placeholder="R$ 0,00" type="text"></div></div>
-    <div class="field-row"><div class="field"><label>Vencimento</label><input type="date"></div><div class="field"><label>Categoria</label><select><option>Serviços</option><option>Material</option><option>Mão de obra</option><option>Administrativo</option></select></div></div>
-    <div class="field"><label>Vinculado a</label><select><option>Nenhum</option><option>OB-0031 — Reforma Horizonte</option><option>OB-0030 — Instalação Elétrica</option></select></div>
+    <input type="hidden" id="fin-edit-ref" value="">
+    <div class="field"><label>Tipo</label><select id="fin-tipo" onchange="onLancamentoTipoChange(this.value)"><option value="receber">A Receber</option><option value="pagar">A Pagar</option></select></div>
+    <div class="field" id="fin-field-cliente"><label>Cliente</label><select id="fin-cliente-id"><option value="">Carregando...</option></select></div>
+    <div class="field" id="fin-field-fornecedor" style="display:none"><label>Fornecedor</label><input id="fin-fornecedor" placeholder="Ex: Hidrobom"></div>
+    <div class="field-row"><div class="field"><label>Descrição</label><input id="fin-descricao" placeholder="Ex: Parcela 2/3 — OB-0031"></div><div class="field"><label>Valor</label><input id="fin-valor" placeholder="R$ 0,00" type="text" oninput="formatarMoedaInput(this)"></div></div>
+    <div class="field-row"><div class="field"><label>Vencimento</label><input id="fin-vencimento" type="date"></div><div class="field"><label>Categoria</label><select id="fin-categoria"><option>Serviços</option><option>Material</option><option>Mão de obra</option><option>Administrativo</option></select></div></div>
+    <div class="field" id="fin-field-obra"><label>Vinculado a</label><select id="fin-obra-id"><option value="">Nenhuma obra</option></select></div>
+    <input type="hidden" id="fin-status-current" value="">
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-lancamento')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-lancamento');showToast('Lançamento criado!','success')"><i class="ti ti-check"></i>Criar Lançamento</button>
+      <button class="btn btn-secondary" id="fin-status-btn" type="button" style="display:none" onclick="alternarStatusLancamentoFinanceiro()"><i class="ti ti-toggle-right"></i>Alterar status</button>
+      <button class="btn btn-primary" id="fin-save-btn" onclick="salvarLancamentoFinanceiro()"><i class="ti ti-check"></i>Criar Lançamento</button>
     </div>
   </div>
 </div>
@@ -1049,15 +1151,71 @@
 <div class="modal-overlay" id="modal-novo-membro">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Membro da Equipe</div>
+      <div class="modal-title" id="eq-modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Membro da Equipe</div>
       <button class="modal-close" onclick="closeModal('modal-novo-membro')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field-row"><div class="field"><label>Nome completo</label><input placeholder="Nome do técnico"></div><div class="field"><label>Função</label><select><option>Eletricista</option><option>Encanador</option><option>Pedreiro</option><option>Mestre de Obras</option><option>Ajudante</option></select></div></div>
-    <div class="field-row"><div class="field"><label>Telefone</label><input placeholder="(11) 99999-0000"></div><div class="field"><label>E-mail</label><input type="email" placeholder="nome@email.com"></div></div>
-    <div class="field-row"><div class="field"><label>Diária (R$)</label><input placeholder="0,00" type="number"></div><div class="field"><label>Comissão (%)</label><input placeholder="0" type="number"></div></div>
+    <input type="hidden" id="eq-edit-id" value="">
+    <div class="field-row">
+      <div class="field"><label>Nome completo</label><input id="eq-nome" placeholder="Nome do técnico"></div>
+      <div class="field"><label>Área</label><select id="eq-area" onchange="onEquipeAreaChange(this.value)"><option value="obras">Obras</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="administrativo">Administrativo</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Função</label><select id="eq-funcao"></select></div>
+      <div class="field"><label>Status</label><select id="eq-status"><option value="disponivel">Disponível</option><option value="campo">Em campo</option><option value="afastado">Afastado</option></select></div>
+    </div>
+    <div class="field-row"><div class="field"><label>Telefone</label><input id="eq-telefone" placeholder="(11) 99999-0000" oninput="onEquipePhoneInput(this)"></div><div class="field"><label>E-mail</label><input id="eq-email" type="email" placeholder="nome@email.com"></div></div>
+    <div class="field-row"><div class="field"><label>Diária</label><input id="eq-diaria" placeholder="R$ 0,00" oninput="onEquipeDiariaInput(this)"></div><div class="field"><label>Comissão</label><input id="eq-comissao" placeholder="0,00%" oninput="onEquipeComissaoInput(this)" onblur="onEquipeComissaoBlur(this)"></div></div>
+    <div class="field"><label>Obra atual</label><input id="eq-obra" placeholder="Código da obra ou —"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-novo-membro')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-novo-membro');showToast('Membro adicionado!','success')"><i class="ti ti-check"></i>Adicionar</button>
+      <button class="btn btn-primary" id="eq-save-btn" onclick="salvarMembroEquipe()"><i class="ti ti-check"></i>Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-equipe-detalhe">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-user" style="margin-right:8px;color:var(--petrol-light)"></i>Detalhes do Colaborador</div>
+      <button class="modal-close" onclick="closeModal('modal-equipe-detalhe')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="info-grid" style="margin-bottom:12px">
+      <div class="info-item"><div class="lbl">Nome</div><div class="val" id="eq-detail-nome">-</div></div>
+      <div class="info-item"><div class="lbl">Área / Função</div><div class="val" id="eq-detail-area-funcao">-</div></div>
+      <div class="info-item"><div class="lbl">Status</div><div class="val" id="eq-detail-status">-</div></div>
+      <div class="info-item"><div class="lbl">Telefone</div><div class="val" id="eq-detail-telefone">-</div></div>
+      <div class="info-item"><div class="lbl">E-mail</div><div class="val" id="eq-detail-email">-</div></div>
+      <div class="info-item"><div class="lbl">Obra Atual</div><div class="val" id="eq-detail-obra-atual">-</div></div>
+    </div>
+
+    <div class="notification-summary" style="margin-bottom:12px">
+      <div class="notification-summary-card"><div class="notification-summary-label">Obras com a equipe</div><div class="notification-summary-value" id="eq-kpi-total-obras" style="color:var(--petrol-light)">0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Obras finalizadas</div><div class="notification-summary-value" id="eq-kpi-finalizadas" style="color:var(--green)">0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Em andamento</div><div class="notification-summary-value" id="eq-kpi-andamento" style="color:var(--petrol-light)">0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Atrasadas</div><div class="notification-summary-value" id="eq-kpi-atrasadas" style="color:var(--red)">0</div></div>
+    </div>
+
+    <div class="notification-summary" style="margin-bottom:12px">
+      <div class="notification-summary-card"><div class="notification-summary-label">Total já pago</div><div class="notification-summary-value" id="eq-kpi-pago" style="color:var(--green)">R$ 0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Total pendente</div><div class="notification-summary-value" id="eq-kpi-pendente" style="color:var(--red)">R$ 0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Diária atual</div><div class="notification-summary-value" id="eq-kpi-diaria" style="color:var(--petrol-light)">R$ 0</div></div>
+      <div class="notification-summary-card"><div class="notification-summary-label">Comissão</div><div class="notification-summary-value" id="eq-kpi-comissao" style="color:var(--orange)">0%</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:12px">
+      <div class="card" style="padding:10px">
+        <div class="section-hdr"><h3 style="font-size:13px">Obras vinculadas</h3></div>
+        <div id="eq-detail-obras-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto"></div>
+      </div>
+      <div class="card" style="padding:10px">
+        <div class="section-hdr"><h3 style="font-size:13px">Pagamentos ao colaborador</h3></div>
+        <div id="eq-detail-pagamentos-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto"></div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="eq-detail-edit-btn" onclick="openEditarMembroEquipe()"><i class="ti ti-edit"></i>Editar colaborador</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-equipe-detalhe')">Fechar</button>
     </div>
   </div>
 </div>
@@ -1099,10 +1257,10 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="assets/js/supabase-config.js?v=20260703"></script>
 <script src="assets/js/theme.js?v=20260703"></script>
-<script src="assets/js/app-part1.js?v=20260726"></script>
-<script src="assets/js/app-part2.js?v=20260723"></script>
+<script src="assets/js/app-part1.js?v=20260731"></script>
+<script src="assets/js/app-part2.js?v=20260738"></script>
 <script src="assets/js/protection.js?v=20260703"></script>
 <script src="assets/js/auth.js?v=20260718"></script>
-<script src="assets/js/crud.js?v=20260726"></script>
+<script src="assets/js/crud.js?v=20260731"></script>
 </body>
 </html>

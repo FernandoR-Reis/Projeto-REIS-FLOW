@@ -77,6 +77,19 @@ function parseMoeda(str) {
   return parseFloat(str.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
+function formatarMoedaInput(input) {
+  if (!input) return;
+
+  const digits = String(input.value || '').replace(/\D/g, '');
+  if (!digits) {
+    input.value = '';
+    return;
+  }
+
+  const amount = Number(digits) / 100;
+  input.value = amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 function getValidadeAutomaticaIso() {
   const date = new Date();
   date.setDate(date.getDate() + 15);
@@ -91,6 +104,191 @@ function formatarDataPtBr(isoDate) {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('pt-BR');
+}
+
+function gerarReferenciaFinanceira(prefixo) {
+  const sufixo = Date.now().toString().slice(-6);
+  return `${prefixo}-${sufixo}`;
+}
+
+function inferirStatusFinanceiro(vencimentoIso, tipo) {
+  const tipoNorm = String(tipo || '').toLowerCase();
+  const statusQuitado = tipoNorm === 'receber' ? 'recebido' : 'pago';
+  const statusAberto = 'pendente';
+  if (!vencimentoIso) return statusAberto;
+
+  const venc = new Date(`${vencimentoIso}T00:00:00`);
+  if (Number.isNaN(venc.getTime())) return statusAberto;
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  if (venc < hoje) return 'vencido';
+  if (venc > hoje) return 'futuro';
+  return statusAberto;
+}
+
+async function salvarLancamentoFinanceiro() {
+  const tipo = String(document.getElementById('fin-tipo')?.value || 'receber').toLowerCase();
+  const editRef = String(document.getElementById('fin-edit-ref')?.value || '').trim();
+  const currentStatus = String(document.getElementById('fin-status-current')?.value || '').trim().toLowerCase();
+  const descricao = String(document.getElementById('fin-descricao')?.value || '').trim();
+  const valorRaw = String(document.getElementById('fin-valor')?.value || '').trim();
+  const vencimento = String(document.getElementById('fin-vencimento')?.value || '').trim();
+  const categoria = String(document.getElementById('fin-categoria')?.value || '').trim() || 'Serviços';
+  const obraId = String(document.getElementById('fin-obra-id')?.value || '').trim() || null;
+  const clienteRaw = String(document.getElementById('fin-cliente-id')?.value || '').trim();
+  const fornecedor = String(document.getElementById('fin-fornecedor')?.value || '').trim();
+  const valor = parseMoeda(valorRaw);
+
+  if (!descricao) {
+    showToast('Informe a descrição do lançamento.', 'warning');
+    return;
+  }
+  if (!valor || valor <= 0) {
+    showToast('Informe um valor válido.', 'warning');
+    return;
+  }
+  if (!vencimento) {
+    showToast('Informe o vencimento do lançamento.', 'warning');
+    return;
+  }
+
+  try {
+    if (tipo === 'receber') {
+      const clienteId = await resolverClienteId(clienteRaw, 'fin-cliente-id');
+      if (!clienteId) {
+        showToast('Selecione um cliente válido para o lançamento a receber.', 'warning');
+        return;
+      }
+
+      const status = editRef && currentStatus ? currentStatus : inferirStatusFinanceiro(vencimento, 'receber');
+
+      if (editRef) {
+        const { data, error } = await db
+          .from('financeiro_receber')
+          .update({ cliente_id: clienteId, obra_id: obraId, descricao, valor, vencimento, status })
+          .eq('referencia', editRef)
+          .select('referencia, descricao, valor, vencimento, status, clientes(nome), obras(codigo)')
+          .single();
+
+        if (error) throw error;
+
+        const idx = financRec.findIndex((item) => String(item.ref || '') === editRef);
+        if (idx >= 0) {
+          financRec[idx] = {
+            ref: data?.referencia || editRef,
+            client: data?.clientes?.nome || '—',
+            obra: data?.obras?.codigo || '—',
+            desc: data?.descricao || descricao,
+            valor: `R$ ${Number(data?.valor || valor).toLocaleString('pt-BR')}`,
+            venc: formatarDataPtBr(data?.vencimento || vencimento),
+            status: data?.status || status,
+            updatedAt: data?.updated_at || new Date().toISOString()
+          };
+        }
+      } else {
+        const referencia = gerarReferenciaFinanceira('REC');
+        const { data, error } = await db
+          .from('financeiro_receber')
+          .insert({
+            referencia,
+            cliente_id: clienteId,
+            obra_id: obraId,
+            descricao,
+            valor,
+            vencimento,
+            status
+          })
+          .select('referencia, descricao, valor, vencimento, status, clientes(nome), obras(codigo)')
+          .single();
+
+        if (error) throw error;
+
+        if (Array.isArray(financRec)) {
+          financRec.unshift({
+            ref: data?.referencia || referencia,
+            client: data?.clientes?.nome || '—',
+            obra: data?.obras?.codigo || '—',
+            desc: data?.descricao || descricao,
+            valor: `R$ ${Number(data?.valor || valor).toLocaleString('pt-BR')}`,
+            venc: formatarDataPtBr(data?.vencimento || vencimento),
+            status: data?.status || status,
+            updatedAt: data?.updated_at || new Date().toISOString()
+          });
+        }
+      }
+    } else {
+      if (!fornecedor) {
+        showToast('Informe o fornecedor para o lançamento a pagar.', 'warning');
+        return;
+      }
+
+      const status = editRef && currentStatus ? currentStatus : inferirStatusFinanceiro(vencimento, 'pagar');
+
+      if (editRef) {
+        const { data, error } = await db
+          .from('financeiro_pagar')
+          .update({ fornecedor, categoria, valor, vencimento, status })
+          .eq('referencia', editRef)
+          .select('referencia, fornecedor, categoria, valor, vencimento, status')
+          .single();
+
+        if (error) throw error;
+
+        const idx = financPag.findIndex((item) => String(item.ref || '') === editRef);
+        if (idx >= 0) {
+          financPag[idx] = {
+            ref: data?.referencia || editRef,
+            forn: data?.fornecedor || fornecedor,
+            cat: data?.categoria || categoria,
+            valor: `R$ ${Number(data?.valor || valor).toLocaleString('pt-BR')}`,
+            venc: formatarDataPtBr(data?.vencimento || vencimento),
+            status: data?.status || status,
+            updatedAt: data?.updated_at || new Date().toISOString()
+          };
+        }
+      } else {
+        const referencia = gerarReferenciaFinanceira('PAG');
+        const { data, error } = await db
+          .from('financeiro_pagar')
+          .insert({
+            referencia,
+            fornecedor,
+            categoria,
+            valor,
+            vencimento,
+            status
+          })
+          .select('referencia, fornecedor, categoria, valor, vencimento, status')
+          .single();
+
+        if (error) throw error;
+
+        if (Array.isArray(financPag)) {
+          financPag.unshift({
+            ref: data?.referencia || referencia,
+            forn: data?.fornecedor || fornecedor,
+            cat: data?.categoria || categoria,
+            valor: `R$ ${Number(data?.valor || valor).toLocaleString('pt-BR')}`,
+            venc: formatarDataPtBr(data?.vencimento || vencimento),
+            status: data?.status || status,
+            updatedAt: data?.updated_at || new Date().toISOString()
+          });
+        }
+      }
+    }
+
+    if (typeof populateFin === 'function') populateFin();
+    if (typeof drawFluxo === 'function') drawFluxo();
+    if (typeof refreshNotificationBadge === 'function') refreshNotificationBadge();
+    if (typeof resetLancamentoModal === 'function') resetLancamentoModal();
+    closeModal('modal-lancamento');
+    showToast(editRef ? 'Lançamento financeiro atualizado com sucesso!' : 'Lançamento financeiro criado com sucesso!', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(`Erro ao salvar lançamento: ${error.message || 'falha desconhecida'}`, 'error');
+  }
 }
 
 function createOrcamentoLineHtml(desc = '', qtd = 1, unit = 0) {
@@ -547,6 +745,119 @@ async function carregarClientesNoSelect(selectId) {
   });
 }
 
+function resetObraModal() {
+  const title = document.querySelector('#modal-nova-obra .modal-title');
+  const btnSalvar = document.getElementById('btn-salvar-obra');
+  const editId = document.getElementById('obra-edit-id');
+  const editClientId = document.getElementById('obra-edit-client-id');
+
+  if (title) {
+    title.innerHTML = '<i class="ti ti-building-factory-2" style="margin-right:8px;color:var(--petrol-light)"></i>Nova Obra';
+  }
+  if (btnSalvar) {
+    btnSalvar.innerHTML = '<i class="ti ti-check"></i>Criar Obra';
+  }
+  if (editId) editId.value = '';
+  if (editClientId) editClientId.value = '';
+
+  ['obra-codigo', 'obra-nome', 'obra-responsavel', 'obra-localizacao', 'obra-prazo', 'obra-valor', 'obra-cliente-nome'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'obra-codigo') {
+      el.value = 'OB-0032';
+    } else {
+      el.value = '';
+    }
+  });
+
+  const orcSelect = document.getElementById('obra-orcamento-id');
+  if (orcSelect) orcSelect.value = '';
+}
+
+async function openObraEdit(obraCode) {
+  const code = String(obraCode || '').trim();
+  if (!code) {
+    showToast('Obra sem código para edição.', 'warning');
+    return;
+  }
+
+  let obra = (Array.isArray(obras) ? obras : []).find((item) => String(item.code || '') === code) || null;
+
+  if (!obra?.id) {
+    try {
+      const { data } = await db
+        .from('obras')
+        .select('id, codigo, nome, cliente_id, responsavel_nome, prazo, valor, status, localizacao, clientes(nome)')
+        .eq('codigo', code)
+        .single();
+      if (data) {
+        obra = {
+          id: data.id || null,
+          code: data.codigo,
+          name: data.nome,
+          clientId: data.cliente_id || null,
+          client: data.clientes?.nome || '—',
+          resp: data.responsavel_nome || '—',
+          prazo: data.prazo || null,
+          valor: Number(data.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          status: data.status || 'orcamento',
+          location: data.localizacao || '—'
+        };
+      }
+    } catch {
+      // Usa fallback local abaixo.
+    }
+  }
+
+  if (!obra) {
+    showToast('Obra não encontrada para edição.', 'warning');
+    return;
+  }
+
+  const editId = document.getElementById('obra-edit-id');
+  const editClientId = document.getElementById('obra-edit-client-id');
+  if (editId) editId.value = obra.id || '';
+  if (editClientId) editClientId.value = obra.clientId || '';
+
+  openModal('modal-nova-obra');
+
+  const title = document.querySelector('#modal-nova-obra .modal-title');
+  const btnSalvar = document.getElementById('btn-salvar-obra');
+  const codigo = document.getElementById('obra-codigo');
+  const nome = document.getElementById('obra-nome');
+  const responsavel = document.getElementById('obra-responsavel');
+  const localizacao = document.getElementById('obra-localizacao');
+  const prazo = document.getElementById('obra-prazo');
+  const valor = document.getElementById('obra-valor');
+  const clienteNome = document.getElementById('obra-cliente-nome');
+  const orcSelect = document.getElementById('obra-orcamento-id');
+
+  if (title) {
+    title.innerHTML = '<i class="ti ti-building-factory-2" style="margin-right:8px;color:var(--petrol-light)"></i>Editar Obra';
+  }
+  if (btnSalvar) {
+    btnSalvar.innerHTML = '<i class="ti ti-device-floppy"></i>Salvar alterações';
+  }
+  if (codigo) codigo.value = obra.code || '—';
+  if (nome) nome.value = obra.name || '';
+  if (responsavel) responsavel.value = obra.resp && obra.resp !== '—' ? obra.resp : '';
+  if (localizacao) localizacao.value = obra.location && obra.location !== '—' ? obra.location : '';
+  if (prazo) prazo.value = obra.prazo ? String(obra.prazo).slice(0, 10) : '';
+  if (valor) valor.value = obra.valor || '';
+  if (clienteNome) clienteNome.value = obra.client || '';
+
+  if (orcSelect) {
+    const optionToSelect = Array.from(orcSelect.options || []).find((option) => {
+      return String(option.getAttribute('data-client-id') || '') === String(obra.clientId || '');
+    });
+
+    if (optionToSelect) {
+      orcSelect.value = optionToSelect.value;
+      if (typeof onObraOrcamentoChange === 'function') onObraOrcamentoChange();
+    }
+  }
+}
+
 // Chama quando os modais de obra e orçamento forem abertos
 document.addEventListener('DOMContentLoaded', () => {
   aplicarMascarasClienteCampos();
@@ -566,6 +877,10 @@ const _openModalOriginal = window.openModal;
 window.openModal = function(id) {
   _openModalOriginal(id);
   if (id === 'modal-nova-obra') {
+    const obraEditId = document.getElementById('obra-edit-id');
+    if (!obraEditId?.value) {
+      resetObraModal();
+    }
     carregarOrcamentosNoSelect('obra-orcamento-id');
     const clientName = document.getElementById('obra-cliente-nome');
     if (clientName) clientName.value = '';
@@ -573,7 +888,14 @@ window.openModal = function(id) {
   if (id === 'modal-novo-orc')  carregarClientesNoSelect('orc-cliente-id');
   if (id === 'modal-novo-orc')  resetOrcamentoModal();
   if (id === 'modal-lancamento') carregarClientesNoSelect('fin-cliente-id');
+  if (id === 'modal-lancamento' && typeof carregarObrasNoSelectFinanceiro === 'function') carregarObrasNoSelectFinanceiro();
+  if (id === 'modal-lancamento' && typeof resetLancamentoModal === 'function') resetLancamentoModal();
   if (id === 'modal-novo-cliente') aplicarMascarasClienteCampos();
+  if (id === 'modal-novo-membro' && typeof resetNovoMembroModal === 'function') resetNovoMembroModal();
+  if (id === 'modal-novo-membro' && typeof onEquipeAreaChange === 'function') {
+    const area = document.getElementById('eq-area')?.value || 'obras';
+    onEquipeAreaChange(area);
+  }
 };
 
 
@@ -581,6 +903,8 @@ window.openModal = function(id) {
 //  SALVAR OBRA
 // -------------------------------------------------------------
 async function salvarObra() {
+  const obraEditId    = document.getElementById('obra-edit-id')?.value?.trim() || '';
+  const obraClientId  = document.getElementById('obra-edit-client-id')?.value?.trim() || '';
   const nome          = document.getElementById('obra-nome').value.trim();
   const orcamentoRaw  = document.getElementById('obra-orcamento-id').value;
   const orcamentoOpt  = document.getElementById('obra-orcamento-id').selectedOptions?.[0] || null;
@@ -591,29 +915,46 @@ async function salvarObra() {
   const valor         = parseMoeda(valorRaw);
 
   if (!nome) { showToast('Informe o título da obra', 'warning'); return; }
-  if (!orcamentoRaw) { showToast('Selecione um orçamento para criar a obra', 'warning'); return; }
+  if (!obraEditId && !orcamentoRaw) { showToast('Selecione um orçamento para criar a obra', 'warning'); return; }
 
   const clienteRaw = orcamentoOpt?.getAttribute('data-client-id') || '';
   const clienteNome = orcamentoOpt?.getAttribute('data-client') || 'Cliente não informado';
-
-  const clienteId = await resolverClienteId(clienteRaw, 'obra-orcamento-id');
-  const codigo = gerarCodigo('OB');
+  const clienteId = clienteRaw ? await resolverClienteId(clienteRaw, 'obra-orcamento-id') : obraClientId;
+  const codigo = obraEditId ? (document.getElementById('obra-codigo')?.value?.trim() || '') : gerarCodigo('OB');
+  const obraAnterior = obraEditId
+    ? (Array.isArray(obras) ? obras : []).find((item) => String(item.id || '') === String(obraEditId)) || null
+    : null;
 
   if (!clienteId) {
     showToast('Cliente sem ID válido no banco. Cadastro local está desativado.', 'warning');
     return;
   }
 
-  const { error } = await db.from('obras').insert({
-    codigo,
-    nome,
-    cliente_id: clienteId,
-    responsavel_nome: responsavel || null,
-    localizacao: localizacao || null,
-    prazo: prazo,
-    valor,
-    status: 'orcamento'
-  });
+  let error = null;
+
+  if (obraEditId) {
+    const result = await db.from('obras').update({
+      nome,
+      cliente_id: clienteId,
+      responsavel_nome: responsavel || null,
+      localizacao: localizacao || null,
+      prazo,
+      valor
+    }).eq('id', obraEditId);
+    error = result.error || null;
+  } else {
+    const result = await db.from('obras').insert({
+      codigo,
+      nome,
+      cliente_id: clienteId,
+      responsavel_nome: responsavel || null,
+      localizacao: localizacao || null,
+      prazo,
+      valor,
+      status: 'orcamento'
+    });
+    error = result.error || null;
+  }
 
   if (error) {
     console.error(error);
@@ -621,7 +962,57 @@ async function salvarObra() {
     return;
   }
 
-  showToast(`Obra ${codigo} criada com sucesso!`, 'success');
+  showToast(obraEditId ? `Obra ${codigo} atualizada com sucesso!` : `Obra ${codigo} criada com sucesso!`, 'success');
+
+  if (typeof addObraHistoryEvent === 'function') {
+    if (obraEditId) {
+      const mudancas = [];
+      if (obraAnterior && String(obraAnterior.name || '') !== String(nome || '')) mudancas.push('nome');
+      if (obraAnterior && String(obraAnterior.resp || '') !== String(responsavel || '')) mudancas.push('responsável');
+      if (obraAnterior && String(obraAnterior.location || '') !== String(localizacao || '')) mudancas.push('localização');
+      if (obraAnterior && String(obraAnterior.prazo || '') !== String(prazo || '')) mudancas.push('prazo');
+      const descricaoMudanca = mudancas.length > 0 ? `Campos alterados: ${mudancas.join(', ')}.` : 'Dados gerais da obra atualizados.';
+      addObraHistoryEvent(codigo, {
+        type: 'obra_editada',
+        title: 'Dados da obra atualizados',
+        desc: descricaoMudanca,
+        metadata: {
+          before: {
+            nome: obraAnterior?.name || null,
+            responsavel: obraAnterior?.resp || null,
+            localizacao: obraAnterior?.location || null,
+            prazo: obraAnterior?.prazo || null,
+            valor: obraAnterior?.valor || null
+          },
+          after: {
+            nome,
+            responsavel: responsavel || null,
+            localizacao: localizacao || null,
+            prazo: prazo || null,
+            valor: valorRaw || null
+          },
+          changed_fields: mudancas
+        }
+      });
+    } else {
+      addObraHistoryEvent(codigo, {
+        type: 'info',
+        title: 'Obra criada',
+        desc: `Obra cadastrada para o cliente ${clienteNome}.`,
+        metadata: {
+          after: {
+            nome,
+            responsavel: responsavel || null,
+            localizacao: localizacao || null,
+            prazo: prazo || null,
+            valor: valorRaw || null,
+            cliente_nome: clienteNome || null
+          }
+        }
+      });
+    }
+  }
+
   closeModal('modal-nova-obra');
 
   // Limpa campos
@@ -631,6 +1022,7 @@ async function salvarObra() {
   });
   const orcSelect = document.getElementById('obra-orcamento-id');
   if (orcSelect) orcSelect.value = '';
+  resetObraModal();
 
   // Recarrega a lista de obras da view atual
   const tbody = document.getElementById('obras-tbody');
@@ -639,6 +1031,11 @@ async function salvarObra() {
   if (kanban) kanban.innerHTML = '';
   await loadAllData();
   populateObras();
+
+  if (window._currentObraCode && String(window._currentObraCode) === String(codigo) && typeof populateObraDetail === 'function') {
+    populateObraDetail(codigo);
+    applyObraDetailAccess();
+  }
 }
 
 
@@ -856,13 +1253,21 @@ async function salvarCliente() {
   carregarClientesNoSelect('orc-cliente-id');
 }
 
-async function toggleClienteStatus() {
-  const editDoc = document.getElementById('cli-edit-doc')?.value?.trim() || '';
-  const statusInput = document.getElementById('cli-current-status');
-  const toggleBtn = document.getElementById('btn-toggle-cliente-status');
+async function toggleClienteStatus(source = 'edit') {
+  const isDetailMode = String(source || '').toLowerCase() === 'detail';
+  const editDoc = isDetailMode
+    ? document.getElementById('cliente-detail-doc-value')?.value?.trim() || ''
+    : document.getElementById('cli-edit-doc')?.value?.trim() || '';
+  const statusInput = isDetailMode
+    ? document.getElementById('cliente-detail-status-value')
+    : document.getElementById('cli-current-status');
+  const toggleBtn = isDetailMode
+    ? document.getElementById('btn-toggle-cliente-status-detail')
+    : document.getElementById('btn-toggle-cliente-status');
+  const detailBadge = document.getElementById('cliente-detail-status');
 
   if (!editDoc) {
-    showToast('Abra um cliente em modo edição para alterar o status.', 'warning');
+    showToast(isDetailMode ? 'Abra um cliente em detalhe para alterar o status.' : 'Abra um cliente em modo edição para alterar o status.', 'warning');
     return;
   }
 
@@ -903,6 +1308,9 @@ async function toggleClienteStatus() {
       ? '<i class="ti ti-user-x"></i>Inativar cliente'
       : '<i class="ti ti-user-check"></i>Ativar cliente';
   }
+  if (isDetailMode && detailBadge) {
+    detailBadge.innerHTML = statusBadge(novoStatus);
+  }
 
   showToast(`Cliente ${novoStatus === 'ativo' ? 'ativado' : 'inativado'} com sucesso!`, 'success');
 
@@ -913,4 +1321,67 @@ async function toggleClienteStatus() {
 
   carregarOrcamentosNoSelect('obra-orcamento-id');
   carregarClientesNoSelect('orc-cliente-id');
+}
+
+async function toggleOrcamentoStatus() {
+  const orcamentoId = document.getElementById('orc-detail-id')?.value?.trim() || '';
+  const statusInput = document.getElementById('orc-detail-status-value');
+  const toggleBtn = document.getElementById('btn-toggle-orc-status');
+  const detailBadge = document.getElementById('orc-detail-status');
+
+  if (!orcamentoId) {
+    showToast('Abra um orçamento em detalhe para alterar o status.', 'warning');
+    return;
+  }
+
+  const orcamentoAtual = (Array.isArray(orcamentos) ? orcamentos : []).find((o) => String(o.id || '') === String(orcamentoId || '')) || null;
+  if (!orcamentoAtual) {
+    showToast('Orçamento não encontrado para atualizar status.', 'warning');
+    return;
+  }
+
+  const statusAtual = String(statusInput?.value || orcamentoAtual.status || 'pendente').toLowerCase();
+  const novoStatus = statusAtual === 'pendente'
+    ? 'aprovado'
+    : statusAtual === 'aprovado'
+      ? 'reprovado'
+      : 'pendente';
+
+  let error = null;
+  if (orcamentoAtual.id) {
+    const result = await db
+      .from('orcamentos')
+      .update({ status: novoStatus })
+      .eq('id', orcamentoAtual.id);
+    error = result.error || null;
+  } else {
+    const idx = orcamentos.findIndex((o) => String(o.id || '') === String(orcamentoId || ''));
+    if (idx >= 0) {
+      orcamentos[idx] = { ...orcamentos[idx], status: novoStatus };
+    }
+  }
+
+  if (error) {
+    showToast('Erro ao alterar status do orçamento: ' + error.message, 'error');
+    return;
+  }
+
+  if (statusInput) statusInput.value = novoStatus;
+  if (detailBadge) {
+    detailBadge.innerHTML = statusBadge(novoStatus);
+  }
+  if (toggleBtn) {
+    toggleBtn.innerHTML = novoStatus === 'aprovado'
+      ? '<i class="ti ti-toggle-right"></i>Reprovar orçamento'
+      : novoStatus === 'reprovado'
+        ? '<i class="ti ti-toggle-right"></i>Reabrir orçamento'
+        : '<i class="ti ti-toggle-right"></i>Aprovar orçamento';
+  }
+
+  showToast(`Orçamento ${novoStatus === 'aprovado' ? 'aprovado' : novoStatus === 'reprovado' ? 'reprovado' : 'reaberto'} com sucesso!`, 'success');
+
+  const orcTbody = document.getElementById('orc-tbody');
+  if (orcTbody) orcTbody.innerHTML = '';
+  await loadAllData();
+  populateOrc();
 }
