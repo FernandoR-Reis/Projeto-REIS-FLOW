@@ -1143,6 +1143,12 @@ select:-webkit-autofill{
 .tl-content{flex:1;padding-top:4px}
 .tl-title{font-size:13px;font-weight:600;margin-bottom:3px}
 .tl-desc{font-size:12px;color:var(--text-muted);line-height:1.5}
+.tl-audit{margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02)}
+.tl-audit-head{display:flex;align-items:center;justify-content:flex-start;margin-bottom:5px}
+.tl-audit-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.02em;background:rgba(58,172,223,0.16);color:var(--petrol-light);border:1px solid rgba(58,172,223,0.35)}
+.tl-audit-title{font-size:11px;color:var(--text-muted);margin-bottom:5px}
+.tl-audit-row{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:11px;line-height:1.45}
+.tl-audit-row span:first-child{color:var(--text-muted);text-transform:capitalize}
 .tl-date{font-size:10px;color:var(--text-dim);margin-top:4px}
 
 /* ORÇAMENTO BUILDER */
@@ -1197,16 +1203,17 @@ select:-webkit-autofill{
 .info-item .val.blue{color:var(--petrol-light)}
 
 /* CHECKLIST */
-.checklist{display:flex;flex-direction:column;gap:6px}
+.checklist{display:flex;flex-direction:column;gap:9px}
 .check-item{
   display:flex;align-items:center;gap:10px;
   padding:8px 10px;border-radius:7px;
   font-size:13px;background:rgba(255,255,255,0.02);
-  border:1px solid var(--border);cursor:pointer;
+  border:1px solid var(--border);
   transition:var(--transition);
 }
 .check-item:hover{border-color:var(--border2)}
 .check-item.done .check-label{text-decoration:line-through;color:var(--text-muted)}
+.etapa-editor-row.dragging{opacity:0.55}
 .check-box{
   width:18px;height:18px;border-radius:5px;flex-shrink:0;
   border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;
