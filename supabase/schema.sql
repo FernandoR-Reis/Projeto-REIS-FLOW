@@ -14,6 +14,7 @@ create table if not exists public.clientes (
   tipo_documento text not null check (tipo_documento in ('CPF', 'CNPJ')),
   documento text not null unique,
   telefone text,
+  email text,
   status text not null default 'ativo' check (status in ('ativo', 'inativo')),
   created_at timestamptz not null default now()
 );
@@ -78,11 +79,14 @@ create table if not exists public.financeiro_pagar (
 create table if not exists public.equipe (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
+  area text not null default 'obras',
   funcao text not null,
+  telefone text,
+  email text,
   diaria numeric(14,2) not null default 0,
   comissao_percentual numeric(5,2) not null default 0,
   obra_id uuid references public.obras (id) on delete set null,
-  status text not null default 'disponivel' check (status in ('campo', 'disponivel', 'afastado')),
+  status text not null default 'disponivel' check (status in ('campo', 'disponivel', 'afastado', 'inativo')),
   created_at timestamptz not null default now()
 );
 
