@@ -3721,6 +3721,33 @@ function setDashboardMetricText(valueId, value, subId, subText) {
   if (subEl && typeof subText === 'string') subEl.textContent = subText;
 }
 
+function updateDashboardDeadlineAlert() {
+  const alertEl = document.getElementById('dash-obras-alert');
+  const titleEl = document.getElementById('dash-obras-alert-title');
+  const descEl = document.getElementById('dash-obras-alert-desc');
+  if (!alertEl || !titleEl || !descEl) return;
+
+  const delayed = Array.isArray(obras)
+    ? obras.filter((obra) => normalizeDashboardStatus(obra?.status) === 'atrasada')
+    : [];
+
+  if (delayed.length === 0) {
+    alertEl.style.display = 'none';
+    return;
+  }
+
+  alertEl.style.display = '';
+  titleEl.textContent = `${delayed.length} obra(s) atrasada(s) no momento`;
+
+  const obrasList = delayed
+    .slice(0, 3)
+    .map((obra) => obra?.code || obra?.name || 'Sem codigo')
+    .join(', ');
+
+  const extra = delayed.length > 3 ? ` e mais ${delayed.length - 3}` : '';
+  descEl.textContent = `${obrasList}${extra} - revise os prazos e notifique as equipes.`;
+}
+
 function applyDashboardMetrics() {
   const m = getDashboardMetrics();
 
@@ -3743,6 +3770,8 @@ function applyDashboardMetrics() {
     const count = Number(m.sourceCount || 0);
     metaEl.textContent = `Resumo operacional | registros analisados: ${count} | atualizado em: ${updatedText}`;
   }
+
+  updateDashboardDeadlineAlert();
 }
 
 function updateDashboardOperationalStats() {
@@ -4431,9 +4460,16 @@ function getImportantNotifications() {
 
 function refreshNotificationBadge() {
   const badge = document.getElementById('notif-count');
+  const obrasBadge = document.getElementById('obras-nav-badge');
   const notifications = getImportantNotifications();
 
   window._importantNotifications = notifications;
+
+  const obraCount = notifications.filter((item) => item.type === 'obra-atrasada' || item.type === 'obra-problema').length;
+  if (obrasBadge) {
+    obrasBadge.textContent = String(obraCount);
+    obrasBadge.style.display = obraCount > 0 ? 'inline-flex' : 'none';
+  }
 
   if (!badge) return notifications;
 

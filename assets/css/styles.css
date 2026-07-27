@@ -463,6 +463,8 @@ body.privacy-guard::before{
   gap:6px;
 }
 
+.login-loading .dots-row .dot:nth-child(n+4){display:none}
+
 .login-loading .dot{
   width:5px;
   height:5px;

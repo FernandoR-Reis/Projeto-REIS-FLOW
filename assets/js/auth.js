@@ -80,56 +80,22 @@ const LOGIN_LOADER_MODULES = [
   },
   {
     icon: 'ti-packages',
-    name: 'Estoque',
-    desc: 'Atualizando materiais e inventário',
+    name: 'Operações',
+    desc: 'Finalizando preparação do ambiente',
     iconColor: '#F59533',
     iconBg: 'rgba(245,149,51,0.12)',
     dotColor: '#F59533'
-  },
-  {
-    icon: 'ti-hard-hat',
-    name: 'Equipe',
-    desc: 'Organizando equipes e responsaveis',
-    iconColor: '#A76EF6',
-    iconBg: 'rgba(167,110,246,0.12)',
-    dotColor: '#A76EF6'
-  },
-  {
-    icon: 'ti-file-dollar',
-    name: 'Orcamentos',
-    desc: 'Preparando propostas e contratos',
-    iconColor: '#3AACDF',
-    iconBg: 'rgba(58,172,223,0.12)',
-    dotColor: '#3AACDF'
-  },
-  {
-    icon: 'ti-layout-dashboard',
-    name: 'Dashboard',
-    desc: 'Gerando indicadores estrategicos',
-    iconColor: '#2DD4A0',
-    iconBg: 'rgba(45,212,160,0.12)',
-    dotColor: '#2DD4A0'
-  },
-  {
-    icon: 'ti-robot',
-    name: 'Tecnologia',
-    desc: 'Processando automacoes e integracoes',
-    iconColor: '#3AACDF',
-    iconBg: 'rgba(33,118,163,0.14)',
-    dotColor: '#3AACDF'
   }
 ];
 
 const LOGIN_LOADER_PROGRESS = [
   'Sincronizando informacoes',
   'Validando dados',
-  'Preparando relatorios',
   'Finalizando carregamento'
 ];
 
-const LOGIN_TRANSITION_MS = 4000;
-
 let loaderRunToken = 0;
+let loaderRunPromise = Promise.resolve();
 
 function getLoginLoaderNodes() {
   return {
@@ -297,7 +263,7 @@ async function runLoginLoaderSequence(token) {
     await loginLoaderShowModule(nodes, i, token);
     if (!isLoaderTokenValid(token)) return;
 
-    const percent = Math.round(((i + 0.7) / total) * 88);
+    const percent = Math.round(((i + 1) / total) * 82);
     nodes.fillEl.style.width = `${percent}%`;
 
     const msgIndex = Math.min(
@@ -321,8 +287,13 @@ async function runLoginLoaderSequence(token) {
   if (!isLoaderTokenValid(token)) return;
 
   nodes.msgEl.textContent = 'Finalizando carregamento';
+  nodes.fillEl.style.transition = 'width 0.9s cubic-bezier(0.22,1,0.36,1)';
   nodes.fillEl.style.width = '100%';
-  await wait(500);
+  await wait(900);
+  if (!isLoaderTokenValid(token)) return;
+
+  nodes.doneEl.classList.add('visible');
+  await wait(1800);
   if (!isLoaderTokenValid(token)) return;
 
   nodes.stageEl.style.transition = 'opacity 0.45s ease';
@@ -333,9 +304,6 @@ async function runLoginLoaderSequence(token) {
   nodes.msgEl.style.opacity = '0';
 
   await wait(420);
-  if (!isLoaderTokenValid(token)) return;
-
-  nodes.doneEl.classList.add('visible');
 }
 
 function bindLoginLoaderEvents() {
@@ -378,9 +346,10 @@ function setLoginLoading(active) {
       ? window.getCurrentTheme()
       : 'dark';
     loginLoaderSetTheme(currentTheme);
-    runLoginLoaderSequence(loaderRunToken);
+    loaderRunPromise = runLoginLoaderSequence(loaderRunToken);
   } else {
     loaderRunToken += 1;
+    loaderRunPromise = Promise.resolve();
   }
 
   if (btn) {
@@ -389,6 +358,12 @@ function setLoginLoading(active) {
       ? '<i class="ti ti-loader-2" style="margin-right:6px"></i>Carregando...'
       : '<i class="ti ti-arrow-right" style="margin-right:6px"></i>Acessar o sistema';
   }
+}
+
+async function playLoginLoader() {
+  setLoginLoading(true);
+  await loaderRunPromise;
+  setLoginLoading(false);
 }
 
 function isLocalHost() {
@@ -515,9 +490,7 @@ async function loginUser() {
 
   if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada === ADMIN_PASSWORD) {
     setLocalAdminSession(true);
-    setLoginLoading(true);
-    await wait(LOGIN_TRANSITION_MS);
-    setLoginLoading(false);
+    await playLoginLoader();
     showToast('Acesso local liberado com Admin.', 'success');
     goToApp('Administrador', 'admin');
     return;
@@ -542,9 +515,7 @@ async function loginUser() {
     return;
   }
 
-  setLoginLoading(true);
-  await wait(LOGIN_TRANSITION_MS);
-  setLoginLoading(false);
+  await playLoginLoader();
   await abrirComPerfil(data.user);
 }
 

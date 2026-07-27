@@ -1770,37 +1770,6 @@ async function loadAllData() {
       if (cliTbody) cliTbody.innerHTML = '';
     }
 
-    if (typeof lerClientesDemoLocal === 'function') {
-      const cores = [
-        'linear-gradient(135deg,#1B4F6B,#2176A3)',
-        'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
-        'linear-gradient(135deg,#0F6E56,#1D9E75)',
-        'linear-gradient(135deg,#6B3A1F,#A3612A)',
-        'linear-gradient(135deg,#1A1D24,#3A4055)',
-        'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
-      ];
-      lerClientesDemoLocal().forEach((c, i) => {
-        const docKey = String(c.documento || '').replace(/\D/g, '');
-        const exists = clientes.some((item) => String(item.doc || '').replace(/\D/g, '') === docKey || String(item.name || '').trim().toLowerCase() === String(c.nome || '').trim().toLowerCase());
-        if (exists) return;
-        const partes = String(c.nome || '').split(' ').filter(Boolean);
-        const iniciais = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : String(c.nome || '').slice(0, 2);
-        clientes.unshift({
-          id: c.id || null,
-          name: c.nome,
-          tipo: c.tipo_documento || '',
-          doc: c.documento || '',
-          tel: c.telefone || '—',
-          email: c.email || '',
-          obras: 0,
-          total: 'R$ —',
-          status: c.status || 'ativo',
-          initials: iniciais.toUpperCase(),
-          bg: cores[i % cores.length]
-        });
-      });
-    }
-
     if (typeof financRec !== 'undefined' && Array.isArray(financRec)) {
       financRec.length = 0;
       (resFinRec.data || []).forEach((item) => {
