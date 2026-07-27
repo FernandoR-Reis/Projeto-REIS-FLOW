@@ -48,6 +48,26 @@ Guarde esses dados, porque no proximo passo vamos conectar seu site com o banco.
 
 Se aparecer dados nessas tabelas, o banco foi criado com sucesso.
 
+## 5.1) Aplicar a base de Usuarios e Permissoes
+
+1. Abra o arquivo `supabase/migrations/20260726_005_usuarios_sistema_convite.sql`.
+2. Copie o conteudo e cole no `SQL Editor` do Supabase.
+3. Clique em `Run`.
+
+Resultado esperado: a tabela `usuarios_sistema` fica criada com RLS e policies por perfil.
+
+## 5.2) Publicar a Edge Function de convite
+
+1. Instale e autentique o Supabase CLI na sua maquina.
+2. Defina as secrets da funcao com `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
+3. Publique a funcao com:
+
+```bash
+supabase functions deploy invite-user
+```
+
+Resultado esperado: o fluxo de convite passa a chamar a funcao e enviar o e-mail pelo Supabase.
+
 ## 6) Validar no dominio provisório
 
 Depois da configuracao, valide tambem no ambiente publicado:

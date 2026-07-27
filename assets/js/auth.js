@@ -18,16 +18,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Evita cair no modo demo sem querer no localhost.
-  if (!isLocalDemoEnabled()) {
-    setLocalAdminSession(false);
-  }
-
-  if (isLocalDemoEnabled() && isLocalAdminSession()) {
-    goToApp('Administrador', 'admin');
-    return;
-  }
-
   const { data } = await db.auth.getSession();
   if (data.session) {
     clearAuthCallbackParams();
@@ -51,12 +41,9 @@ function clearAuthCallbackParams() {
   const url = new URL(window.location.href);
   const query = url.searchParams;
 
-  // Mantem apenas flags locais úteis e remove parâmetros transitórios do OAuth.
-  const keepLocalDemo = query.get('localdemo');
   const keepRecovery = query.get('recovery');
 
   url.search = '';
-  if (keepLocalDemo === '1') url.searchParams.set('localdemo', '1');
   if (keepRecovery === '1' || keepRecovery === 'true') url.searchParams.set('recovery', keepRecovery);
   url.hash = '';
 
@@ -67,41 +54,6 @@ function clearAuthCallbackParams() {
 function showResetPasswordForm() {
   if (typeof switchLoginTab === 'function') {
     switchLoginTab('reset', null);
-  }
-}
-
-function isLocalHost() {
-  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
-}
-
-function isLocalDemoEnabled() {
-  const query = new URLSearchParams(window.location.search);
-  return isLocalHost() && query.get('localdemo') === '1';
-}
-
-function isLocalAdminSession() {
-  return sessionStorage.getItem('reisflow_admin_local') === '1';
-}
-
-function setLocalAdminSession(active) {
-  if (active) {
-    sessionStorage.setItem('reisflow_admin_local', '1');
-  } else {
-    sessionStorage.removeItem('reisflow_admin_local');
-  }
-}
-
-async function loginWithOAuth(provider) {
-  const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-  const redirectTo = `${baseUrl}index.html`;
-
-  const { error } = await db.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo }
-  });
-
-  if (error) {
-    showToast(getAuthErrorMessage(error, 'Nao foi possivel iniciar o login social.'), 'error');
   }
 }
 
@@ -439,6 +391,22 @@ function setLoginLoading(active) {
   }
 }
 
+function isLocalHost() {
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname);
+}
+
+function setLocalAdminSession(active) {
+  if (active) {
+    sessionStorage.setItem('reisflow_admin_local', '1');
+  } else {
+    sessionStorage.removeItem('reisflow_admin_local');
+  }
+}
+
+function isLocalAdminSession() {
+  return sessionStorage.getItem('reisflow_admin_local') === '1';
+}
+
 async function abrirComPerfil(user) {
   const email = user.email || '';
   const permitidoPorEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -449,11 +417,20 @@ async function abrirComPerfil(user) {
     .eq('id', user.id)
     .maybeSingle();
 
-  const cargo = 'admin';
+  const cargoPerfil = String(perfil?.cargo || '').toLowerCase();
+  const cargoMetadata = String(user?.user_metadata?.cargo || user?.user_metadata?.role || '').toLowerCase();
+  const cargoDetectado = permitidoPorEmail ? 'admin' : (cargoPerfil || cargoMetadata || 'operador');
+  const cargo = typeof normalizeRole === 'function'
+    ? normalizeRole(cargoDetectado)
+    : cargoDetectado;
   const nome = perfil?.nome || user.user_metadata?.nome || email;
 
   if (!perfil || perfil.cargo !== cargo || !perfil.nome) {
     await db.from('profiles').upsert({ id: user.id, nome, cargo });
+  }
+
+  if (typeof syncUsuarioSistemaIdentityFromAuth === 'function') {
+    await syncUsuarioSistemaIdentityFromAuth();
   }
 
   goToApp(nome, cargo);
@@ -536,36 +513,13 @@ async function loginUser() {
     return;
   }
 
-  if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada.toUpperCase() === ADMIN_PASSWORD) {
-    let demoData = null;
-    let demoError = null;
-
-    try {
-      const authResponse = await db.auth.signInWithPassword({ email, password: senha });
-      demoData = authResponse.data;
-      demoError = authResponse.error;
-    } catch (err) {
-      demoError = err;
-    }
-
+  if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada === ADMIN_PASSWORD) {
+    setLocalAdminSession(true);
     setLoginLoading(true);
     await wait(LOGIN_TRANSITION_MS);
     setLoginLoading(false);
-
-    if (!demoError && demoData?.user) {
-      setLocalAdminSession(false);
-      await abrirComPerfil(demoData.user);
-      return;
-    }
-
-    if (isLocalDemoEnabled()) {
-      setLocalAdminSession(true);
-      showToast('Modo demo local ativo: dados reais do banco nao serao exibidos.', 'warning');
-      goToApp('Administrador', 'admin');
-      return;
-    }
-
-    showToast('Credenciais demo locais nao autenticam no banco. Entre com GitHub ou e-mail/senha do Supabase.', 'warning');
+    showToast('Acesso local liberado com Admin.', 'success');
+    goToApp('Administrador', 'admin');
     return;
   }
 
@@ -765,3 +719,9 @@ async function logoutUser() {
   await db.auth.signOut();
   goToLogin();
 }
+
+window.addEventListener('DOMContentLoaded', async () => {
+  if (typeof refreshUsuariosSistemaData === 'function') {
+    await refreshUsuariosSistemaData();
+  }
+});

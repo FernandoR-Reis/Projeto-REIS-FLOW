@@ -11,6 +11,13 @@ function gerarCodigo(prefixo) {
 
 const CRUD_DEMO_CLIENTES_STORAGE_KEY = 'reisflow_demo_clientes';
 const CLIENTE_EMAILS_STORAGE_KEY = 'reisflow_cliente_emails';
+const ORCAMENTO_STATUS_CLIENTE_PENDENTE = 'cliente_pendente';
+
+window._orcamentoClienteOptionsCache = window._orcamentoClienteOptionsCache || [];
+window._orcamentoClienteContext = window._orcamentoClienteContext || {
+  returnFocusId: 'orc-cliente-search',
+  mode: 'selected'
+};
 
 function lerMapaEmailsClientes() {
   try {
@@ -71,10 +78,226 @@ function lerClientesDemoLocal() {
   }
 }
 
+function salvarClientesDemoLocal(lista) {
+  localStorage.setItem(CRUD_DEMO_CLIENTES_STORAGE_KEY, JSON.stringify(Array.isArray(lista) ? lista : []));
+}
+
+async function hasAuthenticatedSupabaseSession() {
+  try {
+    const { data } = await db.auth.getSession();
+    return !!data?.session;
+  } catch {
+    return false;
+  }
+}
+
+function isLocalSessionlessMode(hasSupabaseSession) {
+  return typeof isLocalHost === 'function'
+    && isLocalHost()
+    && !hasSupabaseSession;
+}
+
+function buildClienteUiRecord({ id, nome, tipo, doc, tel, email, status }, index = 0) {
+  const cores = [
+    'linear-gradient(135deg,#1B4F6B,#2176A3)',
+    'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
+    'linear-gradient(135deg,#0F6E56,#1D9E75)',
+    'linear-gradient(135deg,#6B3A1F,#A3612A)',
+    'linear-gradient(135deg,#1A1D24,#3A4055)',
+    'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
+  ];
+  const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+  const iniciais = partes.length > 1
+    ? `${partes[0][0]}${partes[partes.length - 1][0]}`
+    : String(nome || '').slice(0, 2);
+
+  return {
+    id: id || null,
+    name: nome,
+    tipo,
+    doc,
+    tel: tel || '—',
+    email: email || '',
+    obras: 0,
+    total: 'R$ —',
+    status: status || 'ativo',
+    initials: String(iniciais || 'CL').toUpperCase(),
+    bg: cores[index % cores.length]
+  };
+}
+
+function syncClienteUiList({ id, nome, tipo, doc, tel, email, status = 'ativo' }) {
+  if (!Array.isArray(clientes) || !nome) return;
+
+  const docKey = String(doc || '').replace(/\D/g, '');
+  const nomeKey = String(nome || '').trim().toLowerCase();
+  const indexUiById = id ? clientes.findIndex((item) => String(item.id || '') === String(id)) : -1;
+  const indexUiByDoc = docKey ? clientes.findIndex((item) => String(item.doc || '').replace(/\D/g, '') === docKey) : -1;
+  const indexUiByName = nomeKey ? clientes.findIndex((item) => String(item.name || '').trim().toLowerCase() === nomeKey) : -1;
+  const indexUi = [indexUiById, indexUiByDoc, indexUiByName].find((idx) => idx >= 0) ?? -1;
+
+  const uiRecord = buildClienteUiRecord({ id, nome, tipo, doc, tel, email, status }, Math.max(indexUi, 0));
+  if (indexUi >= 0) {
+    clientes[indexUi] = { ...clientes[indexUi], ...uiRecord };
+  } else {
+    clientes.unshift(uiRecord);
+  }
+}
+
+async function ensureClientePendenteVisivel(nome, options = {}) {
+  const nomeLimpo = String(nome || '').trim();
+  if (!nomeLimpo) return null;
+
+  const nomeKey = nomeLimpo.toLowerCase();
+  const existenteUi = Array.isArray(clientes)
+    ? clientes.find((item) => String(item?.name || '').trim().toLowerCase() === nomeKey)
+    : null;
+  if (existenteUi) return existenteUi;
+
+  const isAdminLocalFallback = !!options.isAdminLocalFallback;
+  const hasSupabaseSession = !!options.hasSupabaseSession;
+
+  if (isAdminLocalFallback) {
+    return salvarClienteEmModoLocal({
+      nome: nomeLimpo,
+      tipo: null,
+      doc: null,
+      tel: '',
+      email: '',
+      endereco: '',
+      observacoes: 'Cliente criado automaticamente a partir de orçamento pendente.',
+      status: 'ativo'
+    });
+  }
+
+  if (!hasSupabaseSession) {
+    syncClienteUiList({ id: null, nome: nomeLimpo, tipo: '', doc: '', tel: '', email: '', status: 'ativo' });
+    return { id: null, nome: nomeLimpo };
+  }
+
+  try {
+    const { data: existentes, error: findError } = await db
+      .from('clientes')
+      .select('id, nome, tipo_documento, documento, telefone, email, status')
+      .eq('nome', nomeLimpo)
+      .limit(1);
+
+    if (!findError && Array.isArray(existentes) && existentes.length > 0) {
+      const encontrado = existentes[0];
+      syncClienteUiList({
+        id: encontrado.id,
+        nome: encontrado.nome,
+        tipo: encontrado.tipo_documento || '',
+        doc: encontrado.documento || '',
+        tel: encontrado.telefone || '',
+        email: encontrado.email || '',
+        status: encontrado.status || 'ativo'
+      });
+      return { id: encontrado.id, nome: encontrado.nome };
+    }
+
+    const { data: criado, error: createError } = await db
+      .from('clientes')
+      .insert({
+        nome: nomeLimpo,
+        tipo_documento: null,
+        documento: null,
+        telefone: null,
+        email: null,
+        endereco: null,
+        observacoes: 'Cliente criado automaticamente a partir de orçamento pendente.',
+        status: 'ativo'
+      })
+      .select('id, nome, tipo_documento, documento, telefone, email, status')
+      .single();
+
+    if (createError) {
+      syncClienteUiList({ id: null, nome: nomeLimpo, tipo: '', doc: '', tel: '', email: '', status: 'ativo' });
+      return { id: null, nome: nomeLimpo };
+    }
+
+    syncClienteUiList({
+      id: criado?.id || null,
+      nome: criado?.nome || nomeLimpo,
+      tipo: criado?.tipo_documento || '',
+      doc: criado?.documento || '',
+      tel: criado?.telefone || '',
+      email: criado?.email || '',
+      status: criado?.status || 'ativo'
+    });
+    return { id: criado?.id || null, nome: criado?.nome || nomeLimpo };
+  } catch {
+    syncClienteUiList({ id: null, nome: nomeLimpo, tipo: '', doc: '', tel: '', email: '', status: 'ativo' });
+    return { id: null, nome: nomeLimpo };
+  }
+}
+
+function salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, endereco = '', observacoes = '', status = 'ativo' }) {
+  const docKey = String(doc || '').replace(/\D/g, '');
+  const nomeKey = String(nome || '').trim().toLowerCase();
+  const listaAtual = lerClientesDemoLocal();
+  const registroLocal = {
+    id: `local:${docKey || Date.now()}`,
+    nome,
+    tipo_documento: tipo || null,
+    documento: doc || null,
+    telefone: tel || null,
+    email: email || '',
+    status,
+    endereco,
+    observacoes
+  };
+
+  const indexLocal = listaAtual.findIndex((item) => {
+    const itemDocKey = String(item.documento || '').replace(/\D/g, '');
+    const itemNomeKey = String(item.nome || '').trim().toLowerCase();
+    if (docKey && itemDocKey) return itemDocKey === docKey;
+    return !!nomeKey && itemNomeKey === nomeKey;
+  });
+  if (indexLocal >= 0) {
+    listaAtual[indexLocal] = { ...listaAtual[indexLocal], ...registroLocal, id: listaAtual[indexLocal].id || registroLocal.id };
+  } else {
+    listaAtual.unshift(registroLocal);
+  }
+  salvarClientesDemoLocal(listaAtual);
+
+  if (Array.isArray(clientes)) {
+    const uiRecord = buildClienteUiRecord({
+      id: indexLocal >= 0 ? (listaAtual[indexLocal]?.id || registroLocal.id) : registroLocal.id,
+      nome,
+      tipo,
+      doc,
+      tel,
+      email,
+      status
+    }, 0);
+    const indexUi = clientes.findIndex((item) => String(item.doc || '').replace(/\D/g, '') === docKey);
+    const indexUiByName = clientes.findIndex((item) => String(item.name || '').trim().toLowerCase() === nomeKey);
+    const finalIndexUi = indexUi >= 0 ? indexUi : indexUiByName;
+    if (finalIndexUi >= 0) {
+      clientes[finalIndexUi] = { ...clientes[finalIndexUi], ...uiRecord };
+    } else {
+      clientes.unshift(uiRecord);
+    }
+  }
+
+  salvarEmailClientePorDoc(doc, email);
+
+  return registroLocal;
+}
+
 // Converte "R$ 148.000" ou "148000" para número
 function parseMoeda(str) {
   if (!str) return 0;
   return parseFloat(str.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
+}
+
+function parseMoedaDigitada(str) {
+  const valor = String(str || '').trim();
+  if (!valor) return 0;
+  if (valor.includes(',') || valor.includes('.')) return parseMoeda(valor);
+  const digits = valor.replace(/\D/g, '');
+  return digits ? Number(digits) / 100 : 0;
 }
 
 function formatarMoedaInput(input) {
@@ -299,9 +522,10 @@ function createOrcamentoLineHtml(desc = '', qtd = 1, unit = 0) {
     .replace(/"/g, '&quot;');
   const quantidade = Number(qtd) > 0 ? Number(qtd) : 1;
   const valorUnit = Number(unit) > 0 ? Number(unit) : 0;
-  const total = Math.round(quantidade * valorUnit).toLocaleString('pt-BR');
+  const total = Number(quantidade * valorUnit).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const valorUnitFmt = Number(valorUnit).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  return `<div class="budget-line"><input placeholder="Serviço / Material" value="${descEscaped}" style="grid-column:1"><input value="${quantidade}" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="${valorUnit}" placeholder="R$ 0,00" oninput="calcLine(this)"><span class="line-total" style="text-align:right;font-weight:600;color:var(--petrol-light)">R$ ${total}</span><button onclick="this.parentElement.remove();calcTotals()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px"><i class="ti ti-x"></i></button></div>`;
+  return `<div class="budget-line"><input placeholder="Serviço / Material" value="${descEscaped}" style="grid-column:1"><input value="${quantidade}" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="${valorUnitFmt}" placeholder="R$ 0,00" inputmode="decimal" oninput="formatarMoedaInput(this); calcLine(this)" onblur="formatarMoedaInput(this); calcLine(this)"><span class="line-total">${total}</span><button class="budget-line-remove" onclick="this.parentElement.remove();calcTotals()"><i class="ti ti-x"></i></button></div>`;
 }
 
 function resetOrcamentoModal() {
@@ -320,6 +544,9 @@ function resetOrcamentoModal() {
 
   const clienteSel = document.getElementById('orc-cliente-id');
   if (clienteSel) clienteSel.value = '';
+  const clienteSearch = document.getElementById('orc-cliente-search');
+  if (clienteSearch) clienteSearch.value = '';
+  setOrcamentoClienteMode('selected');
   const descricao = document.getElementById('orc-descricao');
   if (descricao) descricao.value = '';
 
@@ -338,6 +565,11 @@ function resetOrcamentoModal() {
   if (validadeInfo) {
     validadeInfo.textContent = `Validade automática: ${formatarDataPtBr(getValidadeAutomaticaIso())} (15 dias).`;
   }
+  const validadeView = document.getElementById('orc-validade-view');
+  if (validadeView) validadeView.value = `${formatarDataPtBr(getValidadeAutomaticaIso())} (15 dias)`;
+
+  setOrcamentoClienteFeedback('Pesquise, selecione ou cadastre um cliente sem sair do orçamento.');
+  renderOrcamentoClienteResults('');
 
   if (typeof calcTotals === 'function') calcTotals();
 }
@@ -382,9 +614,35 @@ async function editOrcamento(orcamentoId) {
   if (validadeInfo) {
     validadeInfo.textContent = `Validade atual: ${registro.validade || '—'} · nova validade automática ao salvar: ${formatarDataPtBr(getValidadeAutomaticaIso())}.`;
   }
+  const validadeView = document.getElementById('orc-validade-view');
+  if (validadeView) validadeView.value = registro.validade || formatarDataPtBr(getValidadeAutomaticaIso());
+
+  if (registro.status === ORCAMENTO_STATUS_CLIENTE_PENDENTE) {
+    const nomePendente = registro.pendingClientName || registro.client || '';
+    const clienteSearch = document.getElementById('orc-cliente-search');
+    if (clienteSearch) clienteSearch.value = nomePendente;
+    setOrcamentoClienteMode(ORCAMENTO_STATUS_CLIENTE_PENDENTE);
+    setOrcamentoClienteFeedback(`Cliente pendente neste orçamento: ${nomePendente || 'não informado'}.`, 'pending');
+  } else {
+    setOrcamentoClienteSelection(registro.clientId || '', registro.client || '', { mode: 'selected' });
+  }
 
   const linhas = document.getElementById('orc-modal-lines');
   if (!linhas) return;
+
+  if (String(id).startsWith('local-orc:')) {
+    const itensLocais = Array.isArray(registro.itens) ? registro.itens : [];
+    linhas.innerHTML = '';
+    if (itensLocais.length > 0) {
+      itensLocais.forEach((item) => {
+        linhas.insertAdjacentHTML('beforeend', createOrcamentoLineHtml(item.descricao, item.quantidade, item.valor_unitario));
+      });
+    } else {
+      linhas.innerHTML = createOrcamentoLineHtml();
+    }
+    if (typeof calcTotals === 'function') calcTotals();
+    return;
+  }
 
   const { data: itens, error } = await db
     .from('orcamento_itens')
@@ -546,8 +804,8 @@ async function resolverClienteId(valorSelecionado, selectId) {
     // Se vier de fallback local, tenta criar o cliente no banco para obter UUID.
     if (valor.startsWith('local:')) {
       const nomeNovo = nomeSelecionado || (chaveLocal && !docRef ? chaveLocal : 'Cliente sem nome');
-      const docNovo = chaveLocal || null;
-      const tipoDocumento = docRef.length === 11 ? 'CPF' : 'CNPJ';
+      const docNovo = docRef ? chaveLocal : null;
+      const tipoDocumento = docRef.length === 11 ? 'CPF' : docRef.length === 14 ? 'CNPJ' : null;
 
       const payload = {
         nome: nomeNovo,
@@ -582,6 +840,7 @@ function adicionarClienteNoMapa(mapa, registro) {
   if (!nome) return;
 
   const doc = String(registro.documento || registro.doc || '').trim();
+  const telefone = String(registro.telefone || registro.tel || '').trim();
   const docKey = doc ? doc.replace(/\D/g, '') : '';
   const nomeKey = nome.toLowerCase();
   const key = docKey || nomeKey;
@@ -591,7 +850,8 @@ function adicionarClienteNoMapa(mapa, registro) {
   mapa.set(key, {
     id: registro.id || null,
     nome,
-    doc
+    doc,
+    telefone
   });
 }
 
@@ -633,7 +893,7 @@ function adicionarOrcamentoNoMapa(mapa, registro) {
   const code = String(registro.codigo || registro.code || '').trim();
   if (!code || mapa.has(code)) return;
 
-  const client = String(registro.clientes?.nome || registro.client || '').trim();
+  const client = String(registro.clientes?.nome || registro.cliente_nome_avulso || registro.pendingClientName || registro.client || '').trim();
   const desc = String(registro.descricao || registro.desc || '').trim();
   const status = String(registro.status || 'pendente').trim();
   const value = typeof registro.valor === 'number'
@@ -655,7 +915,7 @@ async function obterOrcamentosParaSelect() {
   const mapa = new Map();
 
   try {
-    const { data } = await db.from('orcamentos').select('id, codigo, descricao, valor, status, cliente_id, clientes(nome)').order('created_at', { ascending: false });
+    const { data } = await db.from('orcamentos').select('id, codigo, descricao, valor, status, cliente_id, cliente_nome_avulso, clientes(nome)').order('created_at', { ascending: false });
     if (Array.isArray(data)) {
       data.forEach((o) => adicionarOrcamentoNoMapa(mapa, o));
     }
@@ -714,7 +974,7 @@ async function obterClientesParaSelect() {
   const mapa = new Map();
 
   try {
-    const { data } = await db.from('clientes').select('id, nome, documento').order('nome');
+    const { data } = await db.from('clientes').select('id, nome, documento, telefone').order('nome');
     if (Array.isArray(data)) {
       data.forEach((c) => adicionarClienteNoMapa(mapa, c));
     }
@@ -728,7 +988,9 @@ async function obterClientesParaSelect() {
 
   lerClientesDemoLocal().forEach((c) => adicionarClienteNoMapa(mapa, c));
 
-  return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const lista = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  window._orcamentoClienteOptionsCache = lista;
+  return lista;
 }
 
 // Preenche o <select> de clientes em um modal com banco + fallback local
@@ -743,6 +1005,318 @@ async function carregarClientesNoSelect(selectId) {
     const value = c.id || `local:${encodeURIComponent(c.doc || c.nome)}`;
     sel.innerHTML += `<option value="${value}">${c.nome}</option>`;
   });
+
+  if (selectId === 'orc-cliente-id' && typeof renderOrcamentoClienteResults === 'function') {
+    renderOrcamentoClienteResults(document.getElementById('orc-cliente-search')?.value || '');
+  }
+}
+
+function getOrcamentoClienteElements() {
+  return {
+    select: document.getElementById('orc-cliente-id'),
+    search: document.getElementById('orc-cliente-search'),
+    results: document.getElementById('orc-cliente-results'),
+    feedback: document.getElementById('orc-cliente-feedback'),
+    mode: document.getElementById('orc-cliente-mode')
+  };
+}
+
+function setOrcamentoClienteFeedback(message, kind = 'default') {
+  const { feedback } = getOrcamentoClienteElements();
+  if (!feedback) return;
+  feedback.textContent = message;
+  feedback.classList.remove('is-pending', 'is-selected', 'is-ready');
+  if (kind === 'pending' || kind === 'selected' || kind === 'ready') {
+    feedback.classList.add(`is-${kind}`);
+  }
+}
+
+function setOrcamentoClienteMode(mode) {
+  const { mode: modeEl } = getOrcamentoClienteElements();
+  if (modeEl) modeEl.value = mode;
+  window._orcamentoClienteContext.mode = mode;
+}
+
+function setOrcamentoClienteSelection(value, nome, options = {}) {
+  const { select, search } = getOrcamentoClienteElements();
+  if (select) select.value = value || '';
+  if (search) search.value = nome || '';
+  setOrcamentoClienteMode(options.mode || 'selected');
+  setOrcamentoClienteFeedback(`Cliente selecionado: ${nome || '—'}.`, 'selected');
+  renderOrcamentoClienteResults(nome || '');
+}
+
+function clearOrcamentoClienteSelection() {
+  const { select, search } = getOrcamentoClienteElements();
+  if (select) select.value = '';
+  if (search) search.value = '';
+  setOrcamentoClienteMode('selected');
+  setOrcamentoClienteFeedback('Pesquise, selecione ou cadastre um cliente sem sair do orçamento.');
+  renderOrcamentoClienteResults('');
+}
+
+function renderOrcamentoClienteResults(query = '') {
+  const { results, select, search, mode } = getOrcamentoClienteElements();
+  if (!results) return;
+
+  const term = String(query || search?.value || '').trim().toLowerCase();
+  const termDigits = term.replace(/\D/g, '');
+  const lista = Array.isArray(window._orcamentoClienteOptionsCache) ? window._orcamentoClienteOptionsCache : [];
+  const currentValue = String(select?.value || '');
+  const currentMode = String(mode?.value || 'selected');
+  const filtered = term
+    ? lista.filter((item) => {
+        const nome = String(item.nome || '').toLowerCase();
+        const doc = String(item.doc || '').toLowerCase();
+        const docDigits = String(item.doc || '').replace(/\D/g, '');
+        const telefone = String(item.telefone || '').toLowerCase();
+        const telefoneDigits = String(item.telefone || '').replace(/\D/g, '');
+        return nome.includes(term)
+          || doc.includes(term)
+          || telefone.includes(term)
+          || (termDigits && (docDigits.includes(termDigits) || telefoneDigits.includes(termDigits)));
+      })
+    : lista.slice(0, 8);
+
+  if (filtered.length === 0) {
+    results.innerHTML = `<div class="inline-client-empty">${term ? 'Nenhum cliente encontrado. Cadastre agora ou continue sem interromper o orçamento.' : 'Comece digitando para buscar um cliente.'}</div>`;
+    if (currentMode !== ORCAMENTO_STATUS_CLIENTE_PENDENTE && currentMode !== 'pending') {
+      setOrcamentoClienteFeedback(term ? 'Nenhum cliente encontrado. Você pode cadastrar um novo cliente agora.' : 'Pesquise, selecione ou cadastre um cliente sem sair do orçamento.');
+    }
+    return;
+  }
+
+  results.innerHTML = filtered.map((item) => {
+    const value = item.id || `local:${encodeURIComponent(item.doc || item.nome)}`;
+    const selectedClass = currentMode === 'selected' && value === currentValue ? ' active' : '';
+    const initials = String(item.nome || 'CL').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0] || '').join('').toUpperCase() || 'CL';
+    const selectedState = selectedClass ? '<span class="inline-client-result-state">Cliente selecionado <i class="ti ti-circle-check"></i></span>' : '<i class="ti ti-arrow-up-right" aria-hidden="true"></i>';
+    return `
+      <button class="inline-client-result${selectedClass}" type="button" onclick="selectOrcamentoCliente('${String(value).replace(/'/g, "&#39;")}', '${String(item.nome || '').replace(/'/g, "&#39;")}')">
+        <span class="inline-client-result-info">
+          <span class="inline-client-result-avatar"><i class="ti ti-user"></i></span>
+          <span class="inline-client-result-main">
+            <span class="inline-client-result-name">${item.nome}</span>
+            <span class="inline-client-result-meta">${item.doc || item.telefone || 'Cliente sem documento informado'}</span>
+          </span>
+        </span>
+        ${selectedState}
+      </button>
+    `;
+  }).join('');
+}
+
+function onOrcamentoClienteSearchInput() {
+  const { select, search } = getOrcamentoClienteElements();
+  if (select) select.value = '';
+  setOrcamentoClienteMode('selected');
+  renderOrcamentoClienteResults(search?.value || '');
+}
+
+function onOrcamentoClienteSearchFocus() {
+  renderOrcamentoClienteResults(document.getElementById('orc-cliente-search')?.value || '');
+}
+
+function selectOrcamentoCliente(value, nome) {
+  setOrcamentoClienteSelection(value, nome, { mode: 'selected' });
+}
+
+function continueOrcamentoSemCliente() {
+  const { select, search } = getOrcamentoClienteElements();
+  const nome = String(search?.value || '').trim();
+  if (!nome) {
+    setOrcamentoClienteMode('selected');
+    setOrcamentoClienteFeedback('Informe o nome do cliente para continuar sem cadastro.', 'pending');
+    showToast('Informe ao menos o nome do cliente antes de continuar sem cadastro.', 'warning');
+    if (search) search.focus();
+    return;
+  }
+
+  if (select) select.value = '';
+  setOrcamentoClienteMode(ORCAMENTO_STATUS_CLIENTE_PENDENTE);
+  setOrcamentoClienteFeedback(
+    `Pronto para prosseguir: ${nome}. O vínculo completo do cadastro pode ser feito depois.`,
+    'ready'
+  );
+  renderOrcamentoClienteResults(nome);
+}
+
+function resetClienteRapidoOrcamentoModal() {
+  const nomeSeed = document.getElementById('orc-cliente-search')?.value?.trim() || '';
+  const ids = ['orc-cli-nome', 'orc-cli-tel', 'orc-cli-doc', 'orc-cli-email', 'orc-cli-endereco', 'orc-cli-observacoes'];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = id === 'orc-cli-nome' ? nomeSeed : '';
+  });
+  const tipo = document.getElementById('orc-cli-tipo');
+  if (tipo) tipo.value = '';
+}
+
+function bindClienteRapidoOrcamentoMasks() {
+  const docEl = document.getElementById('orc-cli-doc');
+  const tipoEl = document.getElementById('orc-cli-tipo');
+  const telEl = document.getElementById('orc-cli-tel');
+  if (!docEl || !tipoEl || !telEl) return;
+
+  const updateDoc = () => {
+    const tipo = String(tipoEl.value || '');
+    if (!tipo) return;
+    docEl.placeholder = tipo === 'CPF' ? '000.000.000-00' : '00.000.000/0001-00';
+    docEl.value = formatarDocumentoPorTipo(docEl.value, tipo);
+  };
+  const updateTel = () => {
+    telEl.value = formatarTelefoneBr(telEl.value);
+  };
+
+  if (!docEl.dataset.maskBoundQuick) {
+    docEl.addEventListener('input', updateDoc);
+    docEl.addEventListener('blur', updateDoc);
+    docEl.dataset.maskBoundQuick = '1';
+  }
+  if (!tipoEl.dataset.maskBoundQuick) {
+    tipoEl.addEventListener('change', updateDoc);
+    tipoEl.dataset.maskBoundQuick = '1';
+  }
+  if (!telEl.dataset.maskBoundQuick) {
+    telEl.addEventListener('input', updateTel);
+    telEl.addEventListener('blur', updateTel);
+    telEl.dataset.maskBoundQuick = '1';
+  }
+
+  updateDoc();
+  updateTel();
+}
+
+function openQuickClienteFromOrcamento() {
+  window._orcamentoClienteContext = {
+    returnFocusId: 'orc-cliente-search',
+    mode: String(document.getElementById('orc-cliente-mode')?.value || 'selected')
+  };
+  openModal('modal-orc-cliente-rapido');
+  resetClienteRapidoOrcamentoModal();
+  bindClienteRapidoOrcamentoMasks();
+}
+
+async function salvarClienteRapidoOrcamento() {
+  const nome = document.getElementById('orc-cli-nome')?.value?.trim() || '';
+  const tel = document.getElementById('orc-cli-tel')?.value?.trim() || '';
+  const tipoSelecionado = document.getElementById('orc-cli-tipo')?.value || '';
+  const doc = document.getElementById('orc-cli-doc')?.value?.trim() || '';
+  const email = document.getElementById('orc-cli-email')?.value?.trim() || '';
+  const endereco = document.getElementById('orc-cli-endereco')?.value?.trim() || '';
+  const observacoes = document.getElementById('orc-cli-observacoes')?.value?.trim() || '';
+
+  if (!nome) {
+    showToast('Informe o nome do cliente.', 'warning');
+    return;
+  }
+  if (!tel) {
+    showToast('Informe o telefone do cliente.', 'warning');
+    return;
+  }
+
+  const telDigits = somenteDigitos(tel);
+  if (telDigits.length < 10 || telDigits.length > 11) {
+    showToast('Telefone inválido. Use DDD + número.', 'warning');
+    return;
+  }
+
+  const docDigits = somenteDigitos(doc);
+  let tipoDocumento = tipoSelecionado;
+  if (docDigits) {
+    if (!tipoDocumento) {
+      tipoDocumento = docDigits.length === 11 ? 'CPF' : docDigits.length === 14 ? 'CNPJ' : '';
+    }
+    if (!tipoDocumento || (tipoDocumento === 'CPF' && docDigits.length !== 11) || (tipoDocumento === 'CNPJ' && docDigits.length !== 14)) {
+      showToast('Documento inválido. Use um CPF com 11 dígitos ou CNPJ com 14 dígitos.', 'warning');
+      return;
+    }
+  }
+
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast('E-mail inválido. Verifique o formato informado.', 'warning');
+      return;
+    }
+  }
+
+  const payload = {
+    nome,
+    tipo: tipoDocumento || null,
+    doc: doc || null,
+    tel,
+    email,
+    endereco,
+    observacoes,
+    status: 'ativo'
+  };
+
+  const hasSupabaseSession = await hasAuthenticatedSupabaseSession();
+  const isLocalNoSessionFallback = isLocalSessionlessMode(hasSupabaseSession);
+  const isAdminLocalFallback = typeof isLocalHost === 'function'
+    && isLocalHost()
+    && typeof isLocalAdminSession === 'function'
+    && isLocalAdminSession()
+    && !hasSupabaseSession;
+  const isOrcamentoLocalFallback = isAdminLocalFallback || isLocalNoSessionFallback;
+
+  let clienteSalvo = null;
+  let error = null;
+
+  if (isOrcamentoLocalFallback) {
+    clienteSalvo = salvarClienteEmModoLocal(payload);
+  } else {
+    const result = await db.from('clientes').insert({
+      nome,
+      tipo_documento: tipoDocumento || null,
+      documento: doc || null,
+      telefone: tel || null,
+      email: email || null,
+      endereco: endereco || null,
+      observacoes: observacoes || null,
+      status: 'ativo'
+    }).select('id, nome, documento, telefone, email, tipo_documento, status').single();
+
+    clienteSalvo = result.data || null;
+    error = result.error || null;
+  }
+
+  if (error) {
+    if (error.code === '23505') {
+      showToast('Já existe um cliente com esse documento.', 'warning');
+    } else {
+      showToast(`Erro ao salvar cliente: ${error.message}`, 'error');
+    }
+    return;
+  }
+
+  syncClienteUiList({
+    id: clienteSalvo?.id || null,
+    nome: clienteSalvo?.nome || nome,
+    tipo: clienteSalvo?.tipo_documento || tipoDocumento || '',
+    doc: clienteSalvo?.documento || clienteSalvo?.doc || doc,
+    tel: clienteSalvo?.telefone || tel,
+    email: clienteSalvo?.email || email,
+    status: clienteSalvo?.status || 'ativo'
+  });
+
+  if (typeof populateClientes === 'function') {
+    populateClientes();
+  } else if (typeof applyClientesFilters === 'function') {
+    applyClientesFilters();
+  }
+
+  await carregarClientesNoSelect('orc-cliente-id');
+  const clienteValue = clienteSalvo?.id || `local:${encodeURIComponent(clienteSalvo?.documento || clienteSalvo?.doc || clienteSalvo?.nome || nome)}`;
+  const clienteNome = clienteSalvo?.nome || nome;
+  setOrcamentoClienteSelection(clienteValue, clienteNome, { mode: 'selected' });
+  closeModal('modal-orc-cliente-rapido');
+
+  const returnFocus = document.getElementById(window._orcamentoClienteContext?.returnFocusId || 'orc-cliente-search');
+  if (returnFocus) returnFocus.focus();
+
+  showToast(`Cliente ${clienteNome} cadastrado e selecionado no orçamento.`, 'success');
 }
 
 function resetObraModal() {
@@ -862,6 +1436,7 @@ async function openObraEdit(obraCode) {
 document.addEventListener('DOMContentLoaded', () => {
   aplicarMascarasClienteCampos();
   resetOrcamentoModal();
+  if (typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
 
   // Pré-carrega quando a página termina de montar
   // (Os selects só ficam corretos depois do login, mas não tem problema)
@@ -887,15 +1462,33 @@ window.openModal = function(id) {
   }
   if (id === 'modal-novo-orc')  carregarClientesNoSelect('orc-cliente-id');
   if (id === 'modal-novo-orc')  resetOrcamentoModal();
-  if (id === 'modal-lancamento') carregarClientesNoSelect('fin-cliente-id');
-  if (id === 'modal-lancamento' && typeof carregarObrasNoSelectFinanceiro === 'function') carregarObrasNoSelectFinanceiro();
-  if (id === 'modal-lancamento' && typeof resetLancamentoModal === 'function') resetLancamentoModal();
-  if (id === 'modal-novo-cliente') aplicarMascarasClienteCampos();
-  if (id === 'modal-novo-membro' && typeof resetNovoMembroModal === 'function') resetNovoMembroModal();
-  if (id === 'modal-novo-membro' && typeof onEquipeAreaChange === 'function') {
-    const area = document.getElementById('eq-area')?.value || 'obras';
-    onEquipeAreaChange(area);
+  if (id === 'modal-orc-cliente-rapido') {
+    resetClienteRapidoOrcamentoModal();
+    bindClienteRapidoOrcamentoMasks();
   }
+  if (id === 'modal-lancamento') {
+    carregarClientesNoSelect('fin-cliente-id');
+    if (typeof carregarObrasNoSelectFinanceiro === 'function') carregarObrasNoSelectFinanceiro();
+    if (typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
+    if (typeof resetLancamentoModal === 'function') resetLancamentoModal();
+  }
+  if (id === 'modal-novo-cliente') aplicarMascarasClienteCampos();
+  if (id === 'modal-novo-membro') {
+    if (typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
+    if (typeof resetNovoMembroModal === 'function') resetNovoMembroModal();
+    if (typeof onEquipeAreaChange === 'function') {
+      const area = document.getElementById('eq-area')?.value || 'obras';
+      onEquipeAreaChange(area);
+    }
+  }
+  if (id === 'modal-novo-item-estoque') {
+    if (typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
+    if (typeof resetEstoqueDraftSession === 'function') resetEstoqueDraftSession();
+  }
+  if (id === 'modal-editar-item-estoque' && typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
+  if (id === 'modal-novo-fornecedor' && typeof refreshConfigDrivenSelects === 'function') refreshConfigDrivenSelects();
+  if (id === 'modal-nova-entrada' && typeof populateEstoqueMaterialOptions === 'function') populateEstoqueMaterialOptions();
+  if (id === 'modal-nova-entrada' && typeof resetEntradaEstoqueModal === 'function') resetEntradaEstoqueModal();
 };
 
 
@@ -1044,7 +1637,9 @@ async function salvarObra() {
 // -------------------------------------------------------------
 async function salvarOrcamento() {
   const orcamentoEditId = document.getElementById('orc-edit-id')?.value?.trim() || '';
-  const clienteRaw = document.getElementById('orc-cliente-id').value;
+  const clienteRaw = document.getElementById('orc-cliente-id')?.value || '';
+  const clienteSearch = document.getElementById('orc-cliente-search')?.value?.trim() || '';
+  const clienteMode = document.getElementById('orc-cliente-mode')?.value || 'selected';
   const descricao  = document.getElementById('orc-descricao').value.trim();
   const validade   = getValidadeAutomaticaIso();
   const margem     = parseFloat(document.getElementById('modal-margem').value) || 0;
@@ -1053,35 +1648,86 @@ async function salvarOrcamento() {
   let subtotal = 0;
   document.querySelectorAll('#orc-modal-lines .budget-line').forEach(line => {
     const inputs = line.querySelectorAll('input');
-    subtotal += (parseFloat(inputs[1].value) || 0) * (parseFloat(inputs[2].value) || 0);
+    subtotal += (parseFloat(inputs[1].value) || 0) * (typeof parseMoedaDigitada === 'function' ? parseMoedaDigitada(inputs[2].value) : parseMoeda(inputs[2].value));
   });
   const desconto     = parseFloat(document.getElementById('modal-desconto').value) || 0;
   const deslocamento = parseFloat(document.getElementById('modal-desloc').value) || 0;
   const valor        = subtotal + subtotal * (margem / 100) + deslocamento - desconto;
 
-  if (!clienteRaw) { showToast('Selecione um cliente', 'warning'); return; }
-
-  const clienteId = await resolverClienteId(clienteRaw, 'orc-cliente-id');
-  if (!clienteId) {
-    showToast('Cliente sem ID válido no banco. Atualize o cadastro do cliente e tente novamente.', 'warning');
-    return;
-  }
-
   if (!descricao) { showToast('Informe a descrição do serviço', 'warning'); return; }
+
+  const linhas = [];
+  document.querySelectorAll('#orc-modal-lines .budget-line').forEach(line => {
+    const inputs = line.querySelectorAll('input');
+    const desc  = inputs[0].value.trim();
+    const qtd   = parseFloat(inputs[1].value) || 1;
+    const unit  = (typeof parseMoedaDigitada === 'function')
+      ? parseMoedaDigitada(inputs[2].value)
+      : parseMoeda(inputs[2].value);
+    if (desc) linhas.push({ descricao: desc, quantidade: qtd, valor_unitario: unit });
+  });
+
+  const hasSupabaseSession = await hasAuthenticatedSupabaseSession();
+  const isLocalNoSessionFallback = isLocalSessionlessMode(hasSupabaseSession);
+  const isAdminLocalFallback = typeof isLocalHost === 'function'
+    && isLocalHost()
+    && typeof isLocalAdminSession === 'function'
+    && isLocalAdminSession()
+    && !hasSupabaseSession;
+  const isOrcamentoLocalFallback = isAdminLocalFallback || isLocalNoSessionFallback;
+
+  let clienteId = null;
+  let clienteNome = clienteSearch || 'Cliente não informado';
+  let statusOrcamento = 'pendente';
+  let clienteNomeAvulso = null;
+
+  if (clienteMode === ORCAMENTO_STATUS_CLIENTE_PENDENTE) {
+    statusOrcamento = ORCAMENTO_STATUS_CLIENTE_PENDENTE;
+    clienteNomeAvulso = clienteSearch || 'Cadastro do cliente pendente';
+    const clientePendente = await ensureClientePendenteVisivel(clienteNomeAvulso, {
+      isAdminLocalFallback: isOrcamentoLocalFallback,
+      hasSupabaseSession
+    });
+    if (clientePendente?.id) {
+      clienteId = clientePendente.id;
+    }
+  } else {
+    if (!clienteRaw) {
+      showToast('Selecione um cliente ou marque o cadastro como pendente.', 'warning');
+      return;
+    }
+
+    const selectedOption = document.getElementById('orc-cliente-id')?.selectedOptions?.[0] || null;
+    clienteNome = selectedOption?.textContent?.trim() || clienteSearch || 'Cliente não informado';
+    clienteId = await resolverClienteId(clienteRaw, 'orc-cliente-id');
+    if (!clienteId) {
+      if (!isOrcamentoLocalFallback) {
+        showToast('Cliente sem ID válido no banco. Atualize o cadastro do cliente e tente novamente.', 'warning');
+        return;
+      }
+    }
+  }
 
   let orcData = null;
   let orcError = null;
   let codigo = '';
 
-  if (orcamentoEditId) {
+  if (isOrcamentoLocalFallback) {
+    showToast('Salve o orçamento com sessão ativa para registrar no banco.', 'warning');
+    return;
+  }
+
+  if (!isOrcamentoLocalFallback && orcamentoEditId) {
     const result = await db
       .from('orcamentos')
       .update({
         cliente_id: clienteId,
+        cliente_nome_avulso: clienteNomeAvulso,
         descricao,
         valor: valor > 0 ? valor : 0,
         margem_percentual: margem,
-        validade
+        validade,
+        status: statusOrcamento
       })
       .eq('id', orcamentoEditId)
       .select('id, codigo')
@@ -1090,16 +1736,17 @@ async function salvarOrcamento() {
     orcData = result.data;
     orcError = result.error;
     codigo = result.data?.codigo || '';
-  } else {
+  } else if (!isOrcamentoLocalFallback) {
     codigo = gerarCodigo('ORC');
     const result = await db.from('orcamentos').insert({
       codigo,
       cliente_id: clienteId,
+      cliente_nome_avulso: clienteNomeAvulso,
       descricao,
       valor: valor > 0 ? valor : 0,
       margem_percentual: margem,
       validade,
-      status: 'pendente'
+      status: statusOrcamento
     }).select('id, codigo').single();
 
     orcData = result.data;
@@ -1113,22 +1760,12 @@ async function salvarOrcamento() {
     return;
   }
 
-  if (orcamentoEditId) {
+  if (!isOrcamentoLocalFallback && orcamentoEditId) {
     await db.from('orcamento_itens').delete().eq('orcamento_id', orcData.id);
   }
 
-  // Salva os itens do orçamento
-  const linhas = [];
-  document.querySelectorAll('#orc-modal-lines .budget-line').forEach(line => {
-    const inputs = line.querySelectorAll('input');
-    const desc  = inputs[0].value.trim();
-    const qtd   = parseFloat(inputs[1].value) || 1;
-    const unit  = parseFloat(inputs[2].value) || 0;
-    if (desc) linhas.push({ orcamento_id: orcData.id, descricao: desc, quantidade: qtd, valor_unitario: unit });
-  });
-
-  if (linhas.length > 0) {
-    await db.from('orcamento_itens').insert(linhas);
+  if (!isOrcamentoLocalFallback && linhas.length > 0) {
+    await db.from('orcamento_itens').insert(linhas.map((item) => ({ ...item, orcamento_id: orcData.id })));
   }
 
   showToast(orcamentoEditId ? `Orçamento ${codigo} atualizado!` : `Orçamento ${codigo} criado!`, 'success');
@@ -1139,8 +1776,14 @@ async function salvarOrcamento() {
 
   const orcTbody = document.getElementById('orc-tbody');
   if (orcTbody) orcTbody.innerHTML = '';
-  await loadAllData();
+  if (!isOrcamentoLocalFallback) {
+    await loadAllData();
+  } else if (typeof populateClientes === 'function') {
+    populateClientes();
+  }
   populateOrc();
+  if (typeof populateClientes === 'function') populateClientes();
+  if (typeof updateDashboardOperationalStats === 'function') updateDashboardOperationalStats();
 }
 
 
@@ -1183,18 +1826,35 @@ async function salvarCliente() {
     return;
   }
 
+  let hasSupabaseSession = false;
+  try {
+    const { data } = await db.auth.getSession();
+    hasSupabaseSession = !!data?.session;
+  } catch {
+    hasSupabaseSession = false;
+  }
+
+  const isAdminLocalFallback = typeof isLocalHost === 'function'
+    && isLocalHost()
+    && typeof isLocalAdminSession === 'function'
+    && isLocalAdminSession()
+    && !hasSupabaseSession;
+
   let error = null;
 
   if (isEditMode) {
     const clienteAtual = typeof findClienteByDoc === 'function' ? findClienteByDoc(editDoc) : null;
     const clienteId = clienteAtual?.id || null;
 
-    if (clienteId) {
+    if (isAdminLocalFallback) {
+      salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, status: 'ativo' });
+    } else if (clienteId) {
       const result = await db.from('clientes').update({
         nome,
         tipo_documento: tipo,
         documento: doc,
-        telefone: tel || null
+        telefone: tel || null,
+        email: email || null
       }).eq('id', clienteId);
       error = result.error || null;
     } else {
@@ -1212,14 +1872,24 @@ async function salvarCliente() {
       }
     }
   } else {
-    const result = await db.from('clientes').insert({
-      nome,
-      tipo_documento: tipo,
-      documento: doc,
-      telefone: tel || null,
-      status: 'ativo'
-    });
-    error = result.error || null;
+    if (isAdminLocalFallback) {
+      salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, status: 'ativo' });
+    } else {
+      const result = await db.from('clientes').insert({
+        nome,
+        tipo_documento: tipo,
+        documento: doc,
+        telefone: tel || null,
+        email: email || null,
+        status: 'ativo'
+      });
+      error = result.error || null;
+    }
+  }
+
+  if (error && isAdminLocalFallback && isErroPermissao(error)) {
+    error = null;
+    salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, status: 'ativo' });
   }
 
   if (error) {
@@ -1231,7 +1901,9 @@ async function salvarCliente() {
     return;
   }
 
-  salvarEmailClientePorDoc(doc, email);
+  if (!isAdminLocalFallback) {
+    salvarEmailClientePorDoc(doc, email);
+  }
 
   showToast(isEditMode ? `${nome} atualizado com sucesso!` : `${nome} cadastrado com sucesso!`, 'success');
   closeModal('modal-novo-cliente');
@@ -1245,8 +1917,13 @@ async function salvarCliente() {
   // Recarrega lista de clientes
   const cliTbody = document.getElementById('cli-tbody');
   if (cliTbody) cliTbody.innerHTML = '';
-  await loadAllData();
-  populateClientes();
+  if (isAdminLocalFallback) {
+    if (typeof updateClientesSummary === 'function') updateClientesSummary();
+    populateClientes();
+  } else {
+    await loadAllData();
+    populateClientes();
+  }
 
   // Atualiza os selects de cliente nos modais
   carregarOrcamentosNoSelect('obra-orcamento-id');

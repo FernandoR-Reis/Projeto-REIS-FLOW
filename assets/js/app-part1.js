@@ -15,13 +15,13 @@ const orcPreviewItems = [
 const ROLE_ACCESS = {
   admin: {
     label: 'Administrador',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'configuracoes'],
-    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-lancamento', 'modal-novo-membro', 'modal-nova-entrada', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-lancamento', 'modal-novo-membro', 'modal-permissoes-equipe', 'modal-nova-entrada', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
   },
   gestor: {
     label: 'Gestor',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'configuracoes'],
-    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-lancamento', 'modal-novo-membro', 'modal-nova-entrada', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-lancamento', 'modal-novo-membro', 'modal-permissoes-equipe', 'modal-nova-entrada', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
   },
   financeiro: {
     label: 'Financeiro',
@@ -30,13 +30,13 @@ const ROLE_ACCESS = {
   },
   tecnico: {
     label: 'Técnico',
-    views: ['dashboard', 'obras', 'estoque'],
-    modals: ['modal-nova-entrada', 'modal-etapas-obra', 'modal-historico-obra']
+    views: ['dashboard', 'obras', 'estoque', 'fornecedores'],
+    modals: ['modal-nova-entrada', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-etapas-obra', 'modal-historico-obra']
   },
   operador: {
     label: 'Operador',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'configuracoes'],
-    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-lancamento', 'modal-equipe-detalhe']
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-lancamento', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-equipe-detalhe']
   }
 };
 
@@ -119,6 +119,7 @@ function applyRolePermissions() {
       button.style.display = canAccessModal(modalMatch[1]) ? '' : 'none';
     }
   });
+
 }
 
 function applyObraDetailAccess() {
@@ -164,6 +165,8 @@ function statusBadge(status) {
     aprovada:'<span class="badge badge-purple">Aprovada</span>',
     pausada:'<span class="badge badge-neutral"><span class="badge-dot"></span>Pausada</span>',
     pendente:'<span class="badge badge-warning"><span class="badge-dot"></span>Pendente</span>',
+    cliente_pendente:'<span class="badge badge-attention"><span class="badge-dot"></span>Cadastro do cliente pendente</span>',
+    dados_incompletos:'<span class="badge badge-attention"><span class="badge-dot"></span>Dados incompletos</span>',
     aprovado:'<span class="badge badge-success"><span class="badge-dot"></span>Aprovado</span>',
     reprovado:'<span class="badge badge-danger"><span class="badge-dot"></span>Reprovado</span>',
     expirado:'<span class="badge badge-neutral"><span class="badge-dot"></span>Expirado</span>',
@@ -1221,6 +1224,7 @@ function navigate(view, element) {
     financeiro:'Financeiro',
     equipes:'Equipes',
     estoque:'Estoque',
+    fornecedores:'Fornecedores',
     configuracoes:'Configurações'
   };
 
@@ -1238,6 +1242,8 @@ function navigate(view, element) {
   }
   if (view === 'equipes') populateEquipes();
   if (view === 'estoque') populateEstoque();
+  if (view === 'fornecedores' && typeof populateFornecedores === 'function') populateFornecedores();
+  if (view === 'configuracoes' && typeof renderSystemConfigEditor === 'function') renderSystemConfigEditor();
 
   if (window.innerWidth <= 900 && typeof closeSidebar === 'function') closeSidebar();
 }
@@ -1482,6 +1488,11 @@ async function loadOrcamentoItens(orcamentoId) {
   const id = String(orcamentoId || '').trim();
   if (!id) return [];
 
+  if (id.startsWith('local-orc:')) {
+    const local = (Array.isArray(orcamentos) ? orcamentos : []).find((item) => String(item.id || '') === id);
+    return Array.isArray(local?.itens) ? local.itens : [];
+  }
+
   const { data, error } = await db
     .from('orcamento_itens')
     .select('descricao, quantidade, valor_unitario')
@@ -1665,7 +1676,7 @@ async function loadAllData() {
   try {
     const [resObras, resOrc, resCli, resFinRec, resFinPag] = await Promise.all([
       db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }),
-      db.from('orcamentos').select('*, clientes(nome)').order('created_at', { ascending: false }),
+      db.from('orcamentos').select('*, clientes(nome), cliente_nome_avulso').order('created_at', { ascending: false }),
       db.from('clientes').select('*').order('nome'),
       db.from('financeiro_receber').select('referencia, descricao, valor, vencimento, status, created_at, clientes(nome), obras(codigo)').order('created_at', { ascending: false }),
       db.from('financeiro_pagar').select('referencia, fornecedor, categoria, valor, vencimento, status, created_at').order('created_at', { ascending: false })
@@ -1714,7 +1725,8 @@ async function loadAllData() {
           id: o.id || null,
           code: o.codigo,
           clientId: o.cliente_id || null,
-          client: o.clientes?.nome || '—',
+          client: o.clientes?.nome || o.cliente_nome_avulso || 'Cadastro pendente',
+          pendingClientName: o.cliente_nome_avulso || '',
           desc: o.descricao,
           valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
           margem: Number(o.margem_percentual).toFixed(0) + '%',
@@ -1756,6 +1768,37 @@ async function loadAllData() {
       });
       const cliTbody = document.getElementById('cli-tbody');
       if (cliTbody) cliTbody.innerHTML = '';
+    }
+
+    if (typeof lerClientesDemoLocal === 'function') {
+      const cores = [
+        'linear-gradient(135deg,#1B4F6B,#2176A3)',
+        'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
+        'linear-gradient(135deg,#0F6E56,#1D9E75)',
+        'linear-gradient(135deg,#6B3A1F,#A3612A)',
+        'linear-gradient(135deg,#1A1D24,#3A4055)',
+        'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
+      ];
+      lerClientesDemoLocal().forEach((c, i) => {
+        const docKey = String(c.documento || '').replace(/\D/g, '');
+        const exists = clientes.some((item) => String(item.doc || '').replace(/\D/g, '') === docKey || String(item.name || '').trim().toLowerCase() === String(c.nome || '').trim().toLowerCase());
+        if (exists) return;
+        const partes = String(c.nome || '').split(' ').filter(Boolean);
+        const iniciais = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : String(c.nome || '').slice(0, 2);
+        clientes.unshift({
+          id: c.id || null,
+          name: c.nome,
+          tipo: c.tipo_documento || '',
+          doc: c.documento || '',
+          tel: c.telefone || '—',
+          email: c.email || '',
+          obras: 0,
+          total: 'R$ —',
+          status: c.status || 'ativo',
+          initials: iniciais.toUpperCase(),
+          bg: cores[i % cores.length]
+        });
+      });
     }
 
     if (typeof financRec !== 'undefined' && Array.isArray(financRec)) {
@@ -1808,6 +1851,10 @@ async function loadAllData() {
 
   if (typeof refreshNotificationBadge === 'function') {
     refreshNotificationBadge();
+  }
+
+  if (typeof applyDashboardMetrics === 'function') {
+    applyDashboardMetrics();
   }
 }
 

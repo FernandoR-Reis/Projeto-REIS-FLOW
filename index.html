@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="assets/css/styles.css?v=20260719">
+<link rel="stylesheet" href="assets/css/styles.css?v=20260756">
 </head>
 <body>
 
@@ -219,10 +219,10 @@
       <div class="nav-item" onclick="navigate('financeiro',this)"><i class="ti ti-cash"></i><span class="label">Financeiro</span></div>
       <div class="nav-item" onclick="navigate('equipes',this)"><i class="ti ti-users-group"></i><span class="label">Equipes</span></div>
       <div class="nav-item" onclick="navigate('estoque',this)"><i class="ti ti-packages"></i><span class="label">Estoque</span></div>
+      <div class="nav-item" onclick="navigate('fornecedores',this)"><i class="ti ti-truck-delivery"></i><span class="label">Fornecedores</span></div>
       <div class="nav-section-label">Sistema</div>
       <div class="nav-item" onclick="navigate('configuracoes',this)"><i class="ti ti-settings"></i><span class="label">Configurações</span></div>
     </nav>
-
     <div class="sidebar-footer">
       <div class="user-card">
         <div class="avatar" style="font-size:12px">CE</div>
@@ -265,7 +265,7 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Visão Geral</h2>
-            <p>Resumo operacional — Junho 2025</p>
+            <p id="dash-metrics-meta">Resumo operacional</p>
           </div>
           <div class="page-header-right">
             <select class="filter-select" style="font-size:12px">
@@ -282,51 +282,57 @@
         <div class="stats-grid">
           <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Ativas</div>
-            <div class="stat-value" style="color:var(--petrol-light)">18</div>
-            <div class="stat-sub"><span class="up">↑ 3</span> este mês</div>
+            <div class="stat-value" id="dash-obras-ativas-value" style="color:var(--petrol-light)">18</div>
+            <div class="stat-sub" id="dash-obras-ativas-sub"><span class="up">↑ 3</span> este mês</div>
             <i class="ti ti-building-factory-2 stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--red)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Atrasadas</div>
-            <div class="stat-value" style="color:var(--red)">4</div>
-            <div class="stat-sub"><span class="down">↑ 1</span> desde ontem</div>
+            <div class="stat-value" id="dash-obras-atrasadas-value" style="color:var(--red)">4</div>
+            <div class="stat-sub" id="dash-obras-atrasadas-sub"><span class="down">↑ 1</span> desde ontem</div>
             <i class="ti ti-alert-circle stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--green)">
             <div class="stat-label">Faturamento Mensal</div>
-            <div class="stat-value" style="color:var(--green)">R$287k</div>
-            <div class="stat-sub"><span class="up">↑ 18%</span> vs mês anterior</div>
+            <div class="stat-value" id="dash-faturamento-mensal-value" style="color:var(--green)">R$287k</div>
+            <div class="stat-sub" id="dash-faturamento-mensal-sub"><span class="up">↑ 18%</span> vs mês anterior</div>
             <i class="ti ti-cash stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:#A76EF6">
             <div class="stat-label">Lucro Previsto</div>
-            <div class="stat-value" style="color:#A76EF6">R$94k</div>
-            <div class="stat-sub"><span class="up">32.7%</span> margem</div>
+            <div class="stat-value" id="dash-lucro-previsto-value" style="color:#A76EF6">R$94k</div>
+            <div class="stat-sub" id="dash-lucro-previsto-sub"><span class="up">32.7%</span> margem</div>
             <i class="ti ti-trending-up stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
             <div class="stat-label">Orç. Pendentes</div>
-            <div class="stat-value" style="color:var(--orange)">9</div>
-            <div class="stat-sub">R$ 412k em aberto</div>
+            <div class="stat-value" id="dash-orc-pendentes-value" style="color:var(--orange)">9</div>
+            <div class="stat-sub" id="dash-orc-pendentes-sub">R$ 412k em aberto</div>
             <i class="ti ti-file-dollar stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
             <div class="stat-label">Equipes em Campo</div>
-            <div class="stat-value" style="color:var(--petrol-light)">7</div>
-            <div class="stat-sub">24 técnicos ativos</div>
+            <div class="stat-value" id="dash-equipes-campo-value" style="color:var(--petrol-light)">0</div>
+            <div class="stat-sub" id="dash-equipes-campo-sub">0 técnicos ativos</div>
             <i class="ti ti-hard-hat stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
             <div class="stat-label">Contas Vencendo</div>
-            <div class="stat-value" style="color:var(--red)">R$43k</div>
-            <div class="stat-sub">Próximos 7 dias</div>
+            <div class="stat-value" id="dash-contas-vencendo-value" style="color:var(--red)">R$43k</div>
+            <div class="stat-sub" id="dash-contas-vencendo-sub">Próximos 7 dias</div>
             <i class="ti ti-calendar-due stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
             <div class="stat-label">A Receber</div>
-            <div class="stat-value" style="color:var(--green)">R$168k</div>
-            <div class="stat-sub">12 parcelas em aberto</div>
+            <div class="stat-value" id="dash-a-receber-value" style="color:var(--green)">R$168k</div>
+            <div class="stat-sub" id="dash-a-receber-sub">12 parcelas em aberto</div>
             <i class="ti ti-receipt stat-icon"></i>
+          </div>
+          <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('estoque',null)">
+            <div class="stat-label">Estoque Crítico</div>
+            <div class="stat-value" id="dash-estoque-critico-value" style="color:var(--orange)">0</div>
+            <div class="stat-sub" id="dash-estoque-critico-sub">0 item(ns) abaixo do mínimo</div>
+            <i class="ti ti-package-import stat-icon"></i>
           </div>
         </div>
 
@@ -533,7 +539,7 @@
 
         <div class="filters-bar">
           <div class="filter-input"><i class="ti ti-search"></i><input id="orc-search" type="text" placeholder="Buscar orçamento..." oninput="applyOrcamentosFilters()"></div>
-          <select id="orc-filter-status" class="filter-select" onchange="applyOrcamentosFilters()"><option value="todos">Todos</option><option value="pendente">Pendente</option><option value="aprovado">Aprovado</option><option value="reprovado">Reprovado</option><option value="expirado">Expirado</option></select>
+          <select id="orc-filter-status" class="filter-select" onchange="applyOrcamentosFilters()"><option value="todos">Todos</option><option value="pendente">Pendente</option><option value="cliente_pendente">Cliente pendente</option><option value="aprovado">Aprovado</option><option value="reprovado">Reprovado</option><option value="expirado">Expirado</option></select>
           <button class="btn btn-ghost btn-sm" type="button" onclick="clearOrcamentosFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
@@ -730,9 +736,10 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Equipes</h2>
-            <p>24 profissionais · 7 equipes ativas</p>
+            <p id="equipes-summary">0 profissionais · 0 equipes ativas</p>
           </div>
           <div class="page-header-right">
+            <button class="btn btn-secondary btn-sm" onclick="openPermissoesEquipeModal()"><i class="ti ti-lock"></i>Permissões</button>
             <button class="btn btn-primary btn-sm" onclick="openModal('modal-novo-membro')"><i class="ti ti-plus"></i>Novo Membro</button>
           </div>
         </div>
@@ -771,10 +778,10 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Estoque</h2>
-            <p>142 itens · 8 abaixo do mínimo</p>
+            <p id="estoque-summary">0 itens · 0 abaixo do mínimo</p>
           </div>
           <div class="page-header-right">
-            <button class="btn btn-secondary btn-sm" onclick="showToast('Relatório de estoque gerado','success')"><i class="ti ti-file-export"></i>Relatório</button>
+            <button class="btn btn-secondary btn-sm" onclick="openModal('modal-novo-item-estoque')"><i class="ti ti-package"></i>Novo Item</button>
             <button class="btn btn-primary btn-sm" onclick="openModal('modal-nova-entrada')"><i class="ti ti-plus"></i>Entrada</button>
           </div>
         </div>
@@ -785,14 +792,53 @@
         </div>
 
         <div class="filters-bar">
-          <div class="filter-input"><i class="ti ti-search"></i><input type="text" placeholder="Buscar material..."></div>
-          <select class="filter-select"><option>Todas as categorias</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option></select>
+          <div class="filter-input"><i class="ti ti-search"></i><input id="estoque-filter-search" type="text" placeholder="Buscar material, código ou fornecedor..." oninput="onEstoqueFiltersChange()"></div>
+          <select id="estoque-filter-categoria" class="filter-select" onchange="onEstoqueFiltersChange()"><option value="todos">Todas as categorias</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearEstoqueFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
         </div>
 
         <div class="table-wrap">
           <table>
             <thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>Estoque</th><th>Mínimo</th><th>Nível</th><th>Custo Unit.</th><th>Fornecedor</th><th>Ações</th></tr></thead>
             <tbody id="estoque-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view fade-in" id="view-fornecedores" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Fornecedores</h2>
+            <p id="fornecedores-summary">0 fornecedores cadastrados · 0 ativos</p>
+          </div>
+          <div class="page-header-right">
+            <button class="btn btn-primary btn-sm" onclick="openModal('modal-novo-fornecedor')"><i class="ti ti-plus"></i>Novo Fornecedor</button>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <div class="filter-input"><i class="ti ti-search"></i><input id="forn-filter-search" type="text" placeholder="Buscar por nome, contato, telefone ou CNPJ..." oninput="onFornecedoresFiltersChange()"></div>
+          <select id="forn-filter-categoria" class="filter-select" onchange="onFornecedoresFiltersChange()">
+            <option value="todos">Todas as categorias</option>
+            <option value="eletrica">Elétrica</option>
+            <option value="hidraulica">Hidráulica</option>
+            <option value="civil">Civil</option>
+            <option value="ferramentas">Ferramentas</option>
+            <option value="epi">EPI</option>
+            <option value="geral">Geral</option>
+          </select>
+          <select id="forn-filter-status" class="filter-select" onchange="onFornecedoresFiltersChange()">
+            <option value="todos">Todos os status</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" type="button" onclick="clearFornecedoresFilters()"><i class="ti ti-x"></i>Limpar filtros</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fornecedor</th><th>Categoria</th><th>Vendedor</th><th>Telefone</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="fornecedores-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -805,9 +851,16 @@
           </div>
         </div>
 
-        <div class="grid-2">
-          <div>
-            <div class="card" style="margin-bottom:16px">
+        <div class="config-section-nav">
+          <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-empresa').scrollIntoView({behavior:'smooth', block:'start'})">Empresa</button>
+          <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-cadastros').scrollIntoView({behavior:'smooth', block:'start'})">Cadastros auxiliares</button>
+          <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-integracoes').scrollIntoView({behavior:'smooth', block:'start'})">Integrações</button>
+          <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-aparencia').scrollIntoView({behavior:'smooth', block:'start'})">Aparência</button>
+        </div>
+
+        <div class="config-layout">
+          <div class="config-column">
+            <section class="card config-panel" id="cfg-empresa">
               <div class="section-hdr"><h3><i class="ti ti-building" style="font-size:14px;color:var(--petrol-light)"></i> Dados da Empresa</h3></div>
               <div class="field"><label>Razão Social</label><input value="Reis Obras e Serviços Ltda" type="text"></div>
               <div class="field"><label>CNPJ</label><input value="12.345.678/0001-00" type="text"></div>
@@ -815,53 +868,86 @@
               <div class="field"><label>Telefone</label><input value="(11) 3847-2000" type="text"></div>
               <div class="field"><label>Endereço</label><input value="Av. Paulista, 1000 — São Paulo, SP" type="text"></div>
               <button class="btn btn-primary btn-sm" onclick="showToast('Dados salvos com sucesso!','success')"><i class="ti ti-check"></i>Salvar alterações</button>
-            </div>
+            </section>
 
-            <div class="card">
-              <div class="section-hdr"><h3><i class="ti ti-users" style="font-size:14px;color:var(--petrol-light)"></i> Usuários e Permissões</h3><button class="btn btn-sm btn-secondary" onclick="openModal('modal-novo-membro')"><i class="ti ti-plus"></i>Convidar</button></div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:1px solid var(--border)">
-                  <div class="avatar-sm avatar">CE</div>
-                  <div style="flex:1"><div style="font-size:13px;font-weight:600">Carlos Eduardo</div><div style="font-size:11px;color:var(--text-muted)">admin@reisflow.com.br</div></div>
-                  <span class="badge badge-info">Admin</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:1px solid var(--border)">
-                  <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">DS</div>
-                  <div style="flex:1"><div style="font-size:13px;font-weight:600">Diego Santos</div><div style="font-size:11px;color:var(--text-muted)">diego@reisflow.com.br</div></div>
-                  <span class="badge badge-neutral">Técnico</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          <div>
-            <div class="card" style="margin-bottom:16px">
+          <div class="config-column">
+            <section class="card config-panel" id="cfg-integracoes">
               <div class="section-hdr"><h3><i class="ti ti-puzzle" style="font-size:14px;color:var(--petrol-light)"></i> Integrações</h3></div>
-              <div style="display:flex;flex-direction:column;gap:10px">
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
-                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-brand-whatsapp" style="font-size:20px;color:#25D366"></i><div><div style="font-size:13px;font-weight:600">WhatsApp Business</div><div style="font-size:11px;color:var(--text-muted)">Envio automático de alertas</div></div></div>
+              <div class="config-integration-list">
+                <div class="config-integration-item">
+                  <div class="config-integration-info"><i class="ti ti-brand-whatsapp" style="font-size:20px;color:#25D366"></i><div><div class="config-integration-name">WhatsApp Business</div><div class="config-integration-desc">Envio automático de alertas</div></div></div>
                   <button class="btn btn-primary btn-xs" onclick="showToast('Conectando WhatsApp...','info')">Conectar</button>
                 </div>
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
-                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-file-type-pdf" style="font-size:20px;color:var(--red)"></i><div><div style="font-size:13px;font-weight:600">Gerador de PDF</div><div style="font-size:11px;color:var(--text-muted)">Orçamentos e relatórios</div></div></div>
+                <div class="config-integration-item">
+                  <div class="config-integration-info"><i class="ti ti-file-type-pdf" style="font-size:20px;color:var(--red)"></i><div><div class="config-integration-name">Gerador de PDF</div><div class="config-integration-desc">Orçamentos e relatórios</div></div></div>
                   <span class="badge badge-success">Ativo</span>
                 </div>
-                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:8px;border:1px solid var(--border)">
-                  <div style="display:flex;align-items:center;gap:10px"><i class="ti ti-robot" style="font-size:20px;color:var(--petrol-light)"></i><div><div style="font-size:13px;font-weight:600">Assistente IA</div><div style="font-size:11px;color:var(--text-muted)">Automações inteligentes</div></div></div>
+                <div class="config-integration-item">
+                  <div class="config-integration-info"><i class="ti ti-robot" style="font-size:20px;color:var(--petrol-light)"></i><div><div class="config-integration-name">Assistente IA</div><div class="config-integration-desc">Automações inteligentes</div></div></div>
                   <button class="btn btn-secondary btn-xs">Em breve</button>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div class="card">
+            <section class="card config-panel" id="cfg-aparencia">
               <div class="section-hdr"><h3><i class="ti ti-palette" style="font-size:14px;color:var(--petrol-light)"></i> Aparência</h3></div>
               <div class="field"><label>Tema</label><select><option>Dark (padrão)</option><option>Light</option><option>Sistema</option></select></div>
               <div class="field"><label>Idioma</label><select><option>Português (BR)</option><option>Inglês</option></select></div>
               <div class="field"><label>Fuso horário</label><select><option>Brasília (UTC-3)</option></select></div>
               <button class="btn btn-primary btn-sm" onclick="showToast('Preferências salvas!','success')"><i class="ti ti-check"></i>Salvar</button>
-            </div>
+            </section>
           </div>
         </div>
+
+        <section class="card config-panel config-panel-wide" id="cfg-cadastros">
+          <div class="section-hdr">
+            <div>
+              <h3><i class="ti ti-adjustments-horizontal" style="font-size:14px;color:var(--petrol-light)"></i> Cadastros Auxiliares</h3>
+              <p class="muted" style="margin:6px 0 0;font-size:12px">Organize aqui as listas editáveis usadas em fornecedores, estoque, lançamentos e funções da equipe.</p>
+            </div>
+            <div class="config-actions">
+              <button class="btn btn-sm btn-secondary" type="button" onclick="saveSystemConfigFromEditor()"><i class="ti ti-device-floppy"></i>Salvar ajustes</button>
+              <button class="btn btn-sm btn-ghost" type="button" onclick="resetSystemConfigToDefaults()"><i class="ti ti-restore"></i>Restaurar padrão</button>
+            </div>
+          </div>
+
+          <div class="config-aux-grid">
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias de fornecedores</div>
+              <textarea id="cfg-supplier-categories" rows="5" placeholder="Elétrica\nHidráulica\nCivil\nFerramentas\nEPI\nGeral"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias de estoque</div>
+              <textarea id="cfg-stock-categories" rows="5" placeholder="Elétrica\nHidráulica\nCivil\nFerramentas\nEPI\nOutros"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias do novo lançamento</div>
+              <textarea id="cfg-launch-categories" rows="5" placeholder="Serviços\nMaterial\nMão de obra\nAdministrativo"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe - Obras</div>
+              <textarea id="cfg-team-roles-obras" rows="5" placeholder="Mestre de Obras\nPedreiro\nAjudante"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe - Elétrica</div>
+              <textarea id="cfg-team-roles-eletrica" rows="5" placeholder="Eletricista\nEletricista Senior\nTécnico"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe - Hidráulica</div>
+              <textarea id="cfg-team-roles-hidraulica" rows="5" placeholder="Encanador\nTécnico Hidráulico\nAjudante"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe - Civil</div>
+              <textarea id="cfg-team-roles-civil" rows="5" placeholder="Pedreiro\nServente\nMestre de Obras"></textarea>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe - Administrativo</div>
+              <textarea id="cfg-team-roles-administrativo" rows="5" placeholder="Comprador\nAssistente Administrativo\nFinanceiro"></textarea>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </main>
@@ -953,47 +1039,97 @@
 </div>
 
 <div class="modal-overlay" id="modal-novo-orc">
-  <div class="modal modal-lg">
-    <div class="modal-header">
+  <div class="modal modal-lg modal-orcamento">
+    <div class="modal-header modal-orcamento-header">
       <div class="modal-title" id="modal-orc-title"><i class="ti ti-file-dollar" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Orçamento</div>
       <button class="modal-close" onclick="closeModal('modal-novo-orc')"><i class="ti ti-x"></i></button>
     </div>
     <input id="orc-edit-id" type="hidden" value="">
-    <div class="field"><label>Cliente</label><select id="orc-cliente-id"><option value="">Carregando...</option></select></div>
-    <div class="field" style="margin-top:-6px;margin-bottom:10px"><label>Validade</label><div id="orc-validade-info" style="font-size:12px;color:var(--text-muted)">Definida automaticamente para 15 dias após a data de criação.</div></div>
-    <div class="field"><label>Descrição do Serviço</label><input id="orc-descricao" placeholder="Ex: Reforma elétrica completa — galpão industrial"></div>
+    <input id="orc-cliente-mode" type="hidden" value="selected">
+    <div class="field orc-field orc-client-block">
+      <label>Cliente</label>
+      <select id="orc-cliente-id" style="display:none"><option value="">Carregando...</option></select>
+      <div class="inline-client-picker">
+        <div class="filter-input inline-client-search orc-client-search-shell">
+          <i class="ti ti-search"></i>
+          <input id="orc-cliente-search" type="text" placeholder="Buscar cliente por nome, telefone ou CPF" autocomplete="off" oninput="onOrcamentoClienteSearchInput()" onfocus="onOrcamentoClienteSearchFocus()">
+          <button class="inline-client-clear" type="button" onclick="clearOrcamentoClienteSelection()" aria-label="Limpar cliente"><i class="ti ti-x"></i></button>
+        </div>
+        <div id="orc-cliente-results" class="inline-client-results"></div>
+        <div class="inline-client-actions orc-client-actions">
+          <button class="btn btn-secondary btn-xs" type="button" onclick="openQuickClienteFromOrcamento()"><i class="ti ti-plus"></i> Novo Cliente</button>
+          <button class="btn btn-ghost btn-xs" type="button" onclick="continueOrcamentoSemCliente()"><i class="ti ti-arrow-right"></i> Continuar sem cadastrar cliente</button>
+        </div>
+        <div id="orc-cliente-feedback" class="inline-client-feedback">Pesquise, selecione ou cadastre um cliente sem sair do orçamento.</div>
+      </div>
+    </div>
+    <div class="orc-grid-2">
+      <div class="field orc-field orc-validade-field"><label>Validade</label><input id="orc-validade-view" value="" readonly></div>
+      <div class="field orc-field"><label>Descrição do Serviço</label><input id="orc-descricao" placeholder="Ex: Reforma elétrica completa — galpão industrial"></div>
+    </div>
+    <div id="orc-validade-info" class="orc-validade-info">Definida automaticamente para 15 dias após a data de criação.</div>
 
-    <div style="margin:16px 0">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:13px;font-weight:600">Itens do Orçamento</span>
+    <div class="orc-builder">
+      <div class="orc-builder-header">
+        <span class="orc-builder-title">Itens do Orçamento</span>
         <button class="btn btn-secondary btn-xs" onclick="addOrcLine()"><i class="ti ti-plus"></i>Adicionar item</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 80px 100px 90px 26px;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);padding:0 4px;margin-bottom:6px">
+      <div class="orc-items-columns">
         <span>Descrição</span><span>Qtd</span><span>Unitário</span><span>Total</span><span></span>
       </div>
-      <div id="orc-modal-lines">
+      <div id="orc-modal-lines" class="orc-modal-lines">
         <div class="budget-line"><input placeholder="Serviço / Material" style="grid-column:1"><input value="1" style="width:100%;text-align:center" oninput="calcLine(this)"><input value="0" placeholder="R$ 0,00" oninput="calcLine(this)"><span class="line-total" style="text-align:right;font-weight:600;color:var(--petrol-light)">R$ 0</span><button onclick="this.parentElement.remove();calcTotals()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:15px"><i class="ti ti-x"></i></button></div>
       </div>
     </div>
 
-    <div style="background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;border:1px solid var(--border);font-size:13px">
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Margem (%)</label><input value="30" id="modal-margem" type="number" oninput="calcTotals()"></div>
-        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Desconto (R$)</label><input value="0" id="modal-desconto" type="number" oninput="calcTotals()"></div>
-        <div class="field" style="flex:1;min-width:120px;margin:0"><label>Deslocamento (R$)</label><input value="0" id="modal-desloc" type="number" oninput="calcTotals()"></div>
+    <div class="orc-summary-panel">
+      <div class="orc-summary-grid">
+        <div class="field orc-field" style="margin:0"><label>Margem (%)</label><input value="30" id="modal-margem" type="number" oninput="calcTotals()"></div>
+        <div class="field orc-field" style="margin:0"><label>Desconto (R$)</label><input value="0" id="modal-desconto" type="number" oninput="calcTotals()"></div>
+        <div class="field orc-field" style="margin:0"><label>Deslocamento (R$)</label><input value="0" id="modal-desloc" type="number" oninput="calcTotals()"></div>
       </div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:20px">
-        <span style="color:var(--text-muted)">Subtotal: <strong id="modal-subtotal" style="color:var(--text)">R$ 0</strong></span>
-        <span style="color:var(--green)">Lucro: <strong id="modal-lucro">R$ 0</strong></span>
-        <span style="color:var(--petrol-light);font-size:16px;font-weight:700">Total: <strong id="modal-total">R$ 0</strong></span>
+      <div class="orc-summary-totals">
+        <span class="orc-total-item">Subtotal: <strong id="modal-subtotal">R$ 0</strong></span>
+        <span class="orc-total-item orc-total-profit">Lucro: <strong id="modal-lucro">R$ 0</strong></span>
+        <span class="orc-total-item orc-total-final">Total: <strong id="modal-total">R$ 0</strong></span>
       </div>
     </div>
 
-    <div class="field" style="margin-top:16px"><label>Condições de pagamento</label><input placeholder="Ex: 30% entrada, 70% na entrega"></div>
-    <div class="modal-footer">
+    <div class="field orc-field" style="margin-top:16px"><label>Condições de pagamento</label><input placeholder="Ex: 30% entrada, 70% na entrega"></div>
+    <div class="modal-footer orcamento-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-novo-orc')">Cancelar</button>
       <button class="btn btn-secondary" onclick="showToast('Rascunho salvo','info');closeModal('modal-novo-orc')"><i class="ti ti-device-floppy"></i>Rascunho</button>
       <button class="btn btn-primary" id="btn-salvar-orc" onclick="salvarOrcamento()"><i class="ti ti-check"></i>Salvar orçamento</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-orc-cliente-rapido">
+  <div class="modal modal-orc-cliente-rapido">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-user-plus" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Cliente no Orçamento</div>
+      <button class="modal-close" onclick="closeModal('modal-orc-cliente-rapido')"><i class="ti ti-x"></i></button>
+    </div>
+    <input id="orc-cli-context" type="hidden" value="orcamento">
+    <div class="field"><label>Nome *</label><input id="orc-cli-nome" placeholder="Nome do cliente ou empresa" required></div>
+    <div class="field"><label>Telefone *</label><input id="orc-cli-tel" placeholder="(11) 99999-0000" required></div>
+    <div class="field-row">
+      <div class="field">
+        <label>CPF/CNPJ</label>
+        <select id="orc-cli-tipo">
+          <option value="">Não informar</option>
+          <option value="CPF">CPF</option>
+          <option value="CNPJ">CNPJ</option>
+        </select>
+      </div>
+      <div class="field"><label>Documento</label><input id="orc-cli-doc" placeholder="Opcional"></div>
+    </div>
+    <div class="field"><label>E-mail</label><input id="orc-cli-email" type="email" placeholder="Opcional"></div>
+    <div class="field"><label>Endereço</label><input id="orc-cli-endereco" placeholder="Opcional"></div>
+    <div class="field"><label>Observações</label><textarea id="orc-cli-observacoes" placeholder="Opcional"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-orc-cliente-rapido')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-orc-cliente" onclick="salvarClienteRapidoOrcamento()"><i class="ti ti-check"></i>Salvar Cliente</button>
     </div>
   </div>
 </div>
@@ -1042,8 +1178,7 @@
     <input id="cli-tipo" type="hidden" value="CNPJ">
     <div class="field-row">
       <div class="field">
-        <label style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-          <span>CPF / CNPJ *</span>
+        <label style="display:flex;flex-direction:column;align-items:flex-start;gap:6px">
           <span class="doc-type-toggle" role="group" aria-label="Selecionar tipo de documento">
             <button type="button" class="doc-type-btn" id="cli-tipo-cpf" onclick="setClienteDocType('CPF')">CPF</button>
             <button type="button" class="doc-type-btn active" id="cli-tipo-cnpj" onclick="setClienteDocType('CNPJ')">CNPJ</button>
@@ -1164,11 +1299,50 @@
       <div class="field"><label>Status</label><select id="eq-status"><option value="disponivel">Disponível</option><option value="campo">Em campo</option><option value="afastado">Afastado</option></select></div>
     </div>
     <div class="field-row"><div class="field"><label>Telefone</label><input id="eq-telefone" placeholder="(11) 99999-0000" oninput="onEquipePhoneInput(this)"></div><div class="field"><label>E-mail</label><input id="eq-email" type="email" placeholder="nome@email.com"></div></div>
-    <div class="field-row"><div class="field"><label>Diária</label><input id="eq-diaria" placeholder="R$ 0,00" oninput="onEquipeDiariaInput(this)"></div><div class="field"><label>Comissão</label><input id="eq-comissao" placeholder="0,00%" oninput="onEquipeComissaoInput(this)" onblur="onEquipeComissaoBlur(this)"></div></div>
+    <div class="field"><label>Diária</label><input id="eq-diaria" placeholder="R$ 0,00" oninput="onEquipeDiariaInput(this)"></div>
+    <div class="card" style="padding:12px;margin:10px 0;background:rgba(255,255,255,0.02)">
+      <div class="section-hdr" style="margin-bottom:10px"><h3 style="font-size:13px"><i class="ti ti-lock" style="font-size:14px;color:var(--petrol-light)"></i> Acesso ao Sistema</h3></div>
+      <div class="field-row" style="margin-bottom:0">
+        <div class="field"><label>Terá acesso ao sistema?</label><select id="eq-acesso" onchange="onEquipeAcessoChange(this.value)"><option value="nao" selected>Não</option><option value="sim">Sim</option></select></div>
+        <div class="field"><label>Perfil de acesso</label><select id="eq-perfil-acesso" disabled><option>Administrador</option><option>Financeiro</option><option>Auxiliar Financeiro</option><option>Compras</option><option>Estoque</option><option>Obras</option><option>RH</option><option>Gerente</option><option>Comercial</option><option selected>Visualizador</option></select></div>
+      </div>
+    </div>
     <div class="field"><label>Obra atual</label><input id="eq-obra" placeholder="Código da obra ou —"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-novo-membro')">Cancelar</button>
       <button class="btn btn-primary" id="eq-save-btn" onclick="salvarMembroEquipe()"><i class="ti ti-check"></i>Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-permissoes-equipe">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-lock" style="margin-right:8px;color:var(--petrol-light)"></i>Permissões de Acesso</div>
+      <button class="modal-close" onclick="closeModal('modal-permissoes-equipe')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row" style="margin-bottom:10px">
+      <div class="field"><label>Buscar colaborador</label><input id="eq-permissoes-search" placeholder="Nome, função, área ou perfil" oninput="onPermissoesEquipeFiltersChange()"></div>
+      <div class="field" style="display:flex;align-items:flex-end"><button class="btn btn-secondary btn-sm" type="button" onclick="openNovoMembroFromPermissoes()"><i class="ti ti-plus"></i>Novo Membro</button></div>
+    </div>
+    <div class="table-wrap" style="max-height:50vh;overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Função</th>
+            <th>Área</th>
+            <th>Perfil</th>
+            <th>Status do acesso</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="eq-permissoes-tbody"></tbody>
+      </table>
+    </div>
+    <div id="eq-permissoes-summary" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-permissoes-equipe')">Fechar</button>
     </div>
   </div>
 </div>
@@ -1199,7 +1373,6 @@
       <div class="notification-summary-card"><div class="notification-summary-label">Total já pago</div><div class="notification-summary-value" id="eq-kpi-pago" style="color:var(--green)">R$ 0</div></div>
       <div class="notification-summary-card"><div class="notification-summary-label">Total pendente</div><div class="notification-summary-value" id="eq-kpi-pendente" style="color:var(--red)">R$ 0</div></div>
       <div class="notification-summary-card"><div class="notification-summary-label">Diária atual</div><div class="notification-summary-value" id="eq-kpi-diaria" style="color:var(--petrol-light)">R$ 0</div></div>
-      <div class="notification-summary-card"><div class="notification-summary-label">Comissão</div><div class="notification-summary-value" id="eq-kpi-comissao" style="color:var(--orange)">0%</div></div>
     </div>
 
     <div class="grid-2" style="gap:12px">
@@ -1226,16 +1399,113 @@
       <div class="modal-title"><i class="ti ti-package-import" style="margin-right:8px;color:var(--petrol-light)"></i>Entrada de Estoque</div>
       <button class="modal-close" onclick="closeModal('modal-nova-entrada')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field"><label>Material</label><select><option>Cabo PIAL 2,5mm</option><option>Tubo PVC 3/4&quot;</option><option>Disjuntor 20A</option><option>Cimento 50kg</option><option>+ Novo material</option></select></div>
-    <div class="field-row"><div class="field"><label>Quantidade</label><input type="number" placeholder="0"></div><div class="field"><label>Custo unitário (R$)</label><input placeholder="0,00" type="text"></div></div>
-    <div class="field"><label>Fornecedor</label><input placeholder="Nome do fornecedor"></div>
+    <div class="field"><label>Material</label><select id="est-entrada-item"><option value="">Selecione um item</option></select></div>
+    <div class="field-row"><div class="field"><label>Quantidade</label><input id="est-entrada-qtd" type="number" min="1" placeholder="0"></div><div class="field"><label>Custo unitário (R$)</label><input id="est-entrada-custo" placeholder="0,00" type="text"></div></div>
+    <div class="field"><label>Fornecedor</label><input id="est-entrada-forn" list="fornecedores-sugestoes" placeholder="Nome do fornecedor"></div>
     <div class="field"><label>Obra de destino (opcional)</label><select><option>Estoque geral</option><option>OB-0031 — Reforma Horizonte</option><option>OB-0030 — Instalação Elétrica</option></select></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-nova-entrada')">Cancelar</button>
-      <button class="btn btn-primary" onclick="closeModal('modal-nova-entrada');showToast('Entrada registrada!','success')"><i class="ti ti-check"></i>Registrar Entrada</button>
+      <button class="btn btn-primary" onclick="registrarEntradaEstoque()"><i class="ti ti-check"></i>Registrar Entrada</button>
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="modal-editar-item-estoque">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-edit" style="margin-right:8px;color:var(--petrol-light)"></i>Editar Item de Estoque</div>
+      <button class="modal-close" onclick="closeModal('modal-editar-item-estoque')"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="hidden" id="est-edit-code" value="">
+    <div class="field-row">
+      <div class="field"><label>Código</label><input id="est-edit-codigo" disabled style="opacity:0.7"></div>
+      <div class="field"><label>Material *</label><input id="est-edit-nome" placeholder="Nome do material"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Categoria *</label><select id="est-edit-categoria"><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select></div>
+      <div class="field"><label>Fornecedor</label><input id="est-edit-fornecedor" list="fornecedores-sugestoes" placeholder="Nome do fornecedor"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Quantidade atual *</label><input id="est-edit-qtd" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Estoque mínimo *</label><input id="est-edit-min" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Custo unitário (R$) *</label><input id="est-edit-custo" placeholder="0,00"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-editar-item-estoque')">Cancelar</button>
+      <button class="btn btn-danger" onclick="excluirItemEstoqueEditando()"><i class="ti ti-trash"></i>Excluir material</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoItemEstoque()"><i class="ti ti-check"></i>Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-novo-item-estoque">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-package" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Item de Estoque</div>
+      <button class="modal-close" onclick="closeModal('modal-novo-item-estoque')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Código (opcional)</label><input id="est-item-codigo" placeholder="Ex: EST-009"></div>
+      <div class="field"><label>Material *</label><input id="est-item-nome" placeholder="Ex: Fita isolante 20m"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Categoria *</label><select id="est-item-categoria"><option value="">Selecione</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select></div>
+      <div class="field"><label>Fornecedor</label><input id="est-item-fornecedor" list="fornecedores-sugestoes" placeholder="Ex: Elétrica Premium"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Qtd. inicial *</label><input id="est-item-qtd" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Estoque mínimo *</label><input id="est-item-min" type="number" min="0" placeholder="0"></div>
+      <div class="field"><label>Custo unitário (R$) *</label><input id="est-item-custo" placeholder="0,00"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-novo-item-estoque')">Cancelar</button>
+      <button class="btn btn-secondary" onclick="limparNovoItemEstoque()">Limpar</button>
+      <button class="btn btn-secondary" id="est-draft-add-btn" onclick="salvarNovoItemEstoque()"><i class="ti ti-plus"></i>Adicionar à lista</button>
+      <button class="btn btn-primary" id="est-draft-submit-btn" onclick="cadastrarItensEstoqueLote()"><i class="ti ti-check"></i>Cadastrar itens</button>
+    </div>
+    <div class="card" style="padding:10px;margin:6px 0 2px 0;background:rgba(255,255,255,0.015)">
+      <div class="section-hdr" style="margin-bottom:8px">
+        <h3 style="font-size:13px"><i class="ti ti-list-check" style="font-size:13px;color:var(--petrol-light)"></i>Itens criados nesta edição</h3>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="est-draft-count" class="badge badge-neutral">0 item(ns)</span>
+          <button class="btn btn-ghost btn-xs" id="est-draft-toggle-btn" onclick="toggleEstoqueDraftExpand()" title="Mostrar mais"><i class="ti ti-chevron-down"></i></button>
+        </div>
+      </div>
+      <div id="est-draft-list" style="display:flex;flex-direction:column;gap:6px;max-height:110px;overflow:auto">
+        <div class="muted" style="font-size:12px">Nenhum item adicionado na pré-lista.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-novo-fornecedor">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="forn-modal-title"><i class="ti ti-truck-delivery" style="margin-right:8px;color:var(--petrol-light)"></i>Novo Fornecedor</div>
+      <button class="modal-close" onclick="closeModal('modal-novo-fornecedor')"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="hidden" id="forn-edit-id" value="">
+    <div class="field-row">
+      <div class="field"><label>Fornecedor *</label><input id="forn-nome" placeholder="Ex: Elétrica Premium" required></div>
+      <div class="field"><label>Categoria principal *</label><select id="forn-categoria"><option value="">Selecione</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="ferramentas">Ferramentas</option><option value="epi">EPI</option><option value="geral">Geral</option></select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Vendedor *</label><input id="forn-vendedor" placeholder="Nome do vendedor" required></div>
+      <div class="field"><label>Telefone *</label><input id="forn-telefone" placeholder="(11) 99999-0000" oninput="onFornecedorTelefoneInput(this)" required></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>E-mail *</label><input id="forn-email" type="email" placeholder="contato@fornecedor.com.br" required></div>
+      <div class="field"><label>CNPJ *</label><input id="forn-cnpj" placeholder="00.000.000/0001-00" oninput="onFornecedorCnpjInput(this)" required></div>
+    </div>
+    <div class="field"><label>Status *</label><select id="forn-status" required><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-novo-fornecedor')">Cancelar</button>
+      <button class="btn btn-primary" id="forn-save-btn" onclick="salvarFornecedor()"><i class="ti ti-check"></i>Cadastrar</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="fornecedores-sugestoes"></datalist>
 
 <div class="modal-overlay" id="modal-notifications">
   <div class="modal modal-notifications">
@@ -1257,10 +1527,10 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="assets/js/supabase-config.js?v=20260703"></script>
 <script src="assets/js/theme.js?v=20260703"></script>
-<script src="assets/js/app-part1.js?v=20260731"></script>
-<script src="assets/js/app-part2.js?v=20260738"></script>
+<script src="assets/js/app-part1.js?v=20260736-2"></script>
+<script src="assets/js/app-part2.js?v=20260755-2"></script>
 <script src="assets/js/protection.js?v=20260703"></script>
-<script src="assets/js/auth.js?v=20260718"></script>
-<script src="assets/js/crud.js?v=20260731"></script>
+<script src="assets/js/auth.js?v=20260722-1"></script>
+<script src="assets/js/crud.js?v=20260723-10"></script>
 </body>
 </html>
