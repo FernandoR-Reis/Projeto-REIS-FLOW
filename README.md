@@ -83,6 +83,15 @@ Abra no navegador:
 http://localhost:8000/index.html
 ```
 
+## Acesso local de teste
+
+Para testar o fluxo de login localmente, você pode utilizar as credenciais de administrador:
+
+- E-mail: admin@reisflow.com.br
+- Senha: Admin
+
+Essas credenciais são destinadas apenas para ambiente local de teste.
+
 ## Tecnologias
 
 - HTML5

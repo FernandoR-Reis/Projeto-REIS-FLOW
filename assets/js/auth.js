@@ -61,6 +61,28 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function formatBrazilPhone(digits) {
+  const num = String(digits || '').replace(/\D/g, '').slice(0, 11);
+  if (!num) return '';
+  if (num.length <= 2) return `(${num}`;
+  if (num.length <= 6) return `(${num.slice(0, 2)}) ${num.slice(2)}`;
+  if (num.length <= 10) return `(${num.slice(0, 2)}) ${num.slice(2, 6)}-${num.slice(6)}`;
+  return `(${num.slice(0, 2)}) ${num.slice(2, 7)}-${num.slice(7)}`;
+}
+
+function onRegisterPhoneInput(input) {
+  if (!input) return;
+  input.value = formatBrazilPhone(input.value);
+}
+
+function onRegisterPhonePaste(event) {
+  const input = event?.target;
+  if (!input) return;
+  event.preventDefault();
+  const text = event.clipboardData?.getData('text') || '';
+  input.value = formatBrazilPhone(text);
+}
+
 const LOGIN_LOADER_MODULES = [
   {
     icon: 'ti-building-factory-2',
@@ -292,12 +314,11 @@ async function runLoginLoaderSequence(token) {
   await wait(900);
   if (!isLoaderTokenValid(token)) return;
 
+  nodes.stageEl.style.transition = 'none';
+  nodes.stageEl.style.opacity = '0';
   nodes.doneEl.classList.add('visible');
   await wait(1800);
   if (!isLoaderTokenValid(token)) return;
-
-  nodes.stageEl.style.transition = 'opacity 0.45s ease';
-  nodes.stageEl.style.opacity = '0';
   nodes.prepText.style.transition = 'opacity 0.35s ease';
   nodes.prepText.style.opacity = '0';
   nodes.msgEl.style.transition = 'opacity 0.3s ease';
@@ -491,7 +512,6 @@ async function loginUser() {
   if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada === ADMIN_PASSWORD) {
     setLocalAdminSession(true);
     await playLoginLoader();
-    showToast('Acesso local liberado com Admin.', 'success');
     goToApp('Administrador', 'admin');
     return;
   }
@@ -524,10 +544,17 @@ async function registerUser() {
   const nome    = document.getElementById('register-nome').value.trim();
   const email   = document.getElementById('register-email').value.trim();
   const empresa = document.getElementById('register-empresa').value.trim();
+  const telefone = document.getElementById('register-telefone')?.value.trim() || '';
   const senha   = document.getElementById('register-senha').value;
 
-  if (!nome || !email || !empresa || !senha) {
+  if (!nome || !email || !empresa || !telefone || !senha) {
     showToast('Preencha todos os campos', 'warning');
+    return;
+  }
+
+  const phoneDigits = telefone.replace(/\D/g, '');
+  if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+    showToast('Informe um telefone valido com DDD.', 'warning');
     return;
   }
 
