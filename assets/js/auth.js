@@ -409,7 +409,7 @@ async function abrirComPerfil(user) {
 
   const { data: perfil } = await db
     .from('profiles')
-    .select('nome, cargo')
+    .select('nome, cargo, empresa_id')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -425,11 +425,20 @@ async function abrirComPerfil(user) {
     await db.from('profiles').upsert({ id: user.id, nome, cargo });
   }
 
+  // Armazena empresa_id na sessão para uso global
+  if (perfil?.empresa_id) {
+    sessionStorage.setItem('reisflow_empresa_id', perfil.empresa_id);
+  }
+
   if (typeof syncUsuarioSistemaIdentityFromAuth === 'function') {
     await syncUsuarioSistemaIdentityFromAuth();
   }
 
   goToApp(nome, cargo);
+}
+
+function getCurrentEmpresaId() {
+  return sessionStorage.getItem('reisflow_empresa_id') || null;
 }
 
 function isEmailNotConfirmedError(error) {
@@ -605,11 +614,24 @@ async function registerUser() {
     return;
   }
 
-  // So cria perfil quando existe sessao ativa; sem sessao, o RLS bloqueia o insert.
+  // So cria empresa/perfil quando existe sessao ativa; sem sessao, o RLS bloqueia o insert.
   if (data.session?.access_token) {
+    // 1. Criar empresa
+    const { data: empresaData, error: empresaError } = await db
+      .from('empresas')
+      .insert({ nome: empresa, telefone: telefone || null })
+      .select('id')
+      .single();
+
+    if (empresaError || !empresaData?.id) {
+      showToast('Conta criada, mas erro ao configurar empresa. Tente entrar novamente.', 'warning');
+      return;
+    }
+
+    // 2. Criar perfil vinculado à empresa com cargo admin
     const { error: profileError } = await db
       .from('profiles')
-      .upsert({ id: data.user.id, nome, cargo: 'operador' });
+      .upsert({ id: data.user.id, nome, cargo: 'admin', empresa_id: empresaData.id });
 
     if (profileError) {
       showToast('Conta criada, mas houve erro ao criar perfil. Tente entrar novamente.', 'warning');
@@ -714,6 +736,7 @@ async function logoutUser() {
   setLocalAdminSession(false);
   sessionStorage.removeItem('reisflow_role');
   sessionStorage.removeItem('reisflow_user_name');
+  sessionStorage.removeItem('reisflow_empresa_id');
   await db.auth.signOut();
   goToLogin();
 }
