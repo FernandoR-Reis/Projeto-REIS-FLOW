@@ -421,8 +421,12 @@ async function abrirComPerfil(user) {
     : cargoDetectado;
   const nome = perfil?.nome || user.user_metadata?.nome || email;
 
-  if (!perfil || perfil.cargo !== cargo || !perfil.nome) {
-    await db.from('profiles').upsert({ id: user.id, nome, cargo });
+  if (!perfil) {
+    // Primeiro acesso: insere sem empresa_id (será vinculado pelo cadastro ou migração)
+    await db.from('profiles').insert({ id: user.id, nome, cargo });
+  } else if (perfil.cargo !== cargo || !perfil.nome) {
+    // Apenas atualiza nome/cargo — nunca sobrescreve empresa_id
+    await db.from('profiles').update({ nome, cargo }).eq('id', user.id);
   }
 
   // Armazena empresa_id na sessão para uso global
