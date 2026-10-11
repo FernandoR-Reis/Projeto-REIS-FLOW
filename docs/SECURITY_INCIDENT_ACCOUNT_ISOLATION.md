@@ -116,7 +116,8 @@ nao tenta corrigir ownership legado automaticamente.
 
 ## Validacao e rollout
 
-- Testes automatizados de cache: `node --test tests/tenant-storage.test.js`.
+- Testes automatizados locais: `node --test tests/*.test.js` (16 testes
+  aprovados).
 - Teste SQL de duas empresas, fixtures inteiramente sinteticas e rollback:
   `supabase/tests/account_isolation.sql`. Deve ser executado em Supabase local
   ou banco de teste depois das migrations; nao executar contra producao.
@@ -124,6 +125,9 @@ nao tenta corrigir ownership legado automaticamente.
   `20261009000112` foram aplicadas ao projeto Supabase de producao e a CLI
   confirmou ambas no historico remoto. A Edge Function `invite-user` foi
   publicada com validacao de membership e status ativo da empresa.
+- O frontend foi publicado em GitHub Pages pelo commit `943e1ca`; o workflow
+  `38115108835` concluiu com sucesso e a pagina publica carregou os novos
+  bundles com cache-busting atualizado.
 - Um probe somente de leitura, usando um UUID sintetico sem conta Auth
   correspondente, retornou tenant/papel nulos e zero clientes, obras e
   orcamentos visiveis. Nenhum registro real foi usado para teste.
