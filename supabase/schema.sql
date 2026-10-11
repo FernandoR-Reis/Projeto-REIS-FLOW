@@ -288,8 +288,6 @@ drop policy if exists profiles_select_own on public.profiles;
 drop policy if exists profiles_update_own on public.profiles;
 drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_select_own on public.profiles for select to authenticated using (auth.uid() = id);
-create policy profiles_insert_own on public.profiles for insert to authenticated with check (auth.uid() = id);
-create policy profiles_update_own on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
 
 drop policy if exists clientes_all_authenticated on public.clientes;
 drop policy if exists obras_all_authenticated on public.obras;
@@ -351,6 +349,36 @@ create policy obra_historico_select_authenticated on public.obra_historico for s
 create policy audit_log_select_privileged on public.audit_log
 for select to authenticated
 using (public.app_has_role(array['admin','gestor','financeiro']::text[]));
+
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'clientes', 'obras', 'orcamentos', 'orcamento_itens',
+    'financeiro_receber', 'financeiro_pagar', 'equipe', 'usuarios_sistema',
+    'estoque_itens', 'fornecedores', 'estoque_movimentos',
+    'obra_etapas', 'obra_historico', 'audit_log'
+  ] loop
+    execute format('drop policy if exists bootstrap_deny_authenticated on public.%I', table_name);
+  end loop;
+end;
+$$;
+
+create policy bootstrap_deny_authenticated on public.clientes as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obras as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.orcamentos as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.orcamento_itens as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.financeiro_receber as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.financeiro_pagar as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.equipe as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.usuarios_sistema as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.estoque_itens as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.fornecedores as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.estoque_movimentos as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obra_etapas as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obra_historico as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.audit_log as restrictive for all to authenticated using (false) with check (false);
 
 create policy clientes_write_by_role on public.clientes
 for all to authenticated

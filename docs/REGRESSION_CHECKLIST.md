@@ -35,6 +35,9 @@ Como usar:
 - [ ] Criar orcamento persiste e reaparece apos reload
 - [ ] Itens do orcamento persistem corretamente
 - [ ] Filtros por status funcionam
+- [ ] Margem-alvo e calculada sobre o total liquido final apos desconto e deslocamento
+- [ ] Edicao de orcamento antigo exige confirmar desconto e deslocamento ausentes no schema legado
+- [ ] Apenas `cliente_pendente` expira apos a validade; demais status permanecem inalterados
 
 ## 5) Clientes
 
@@ -48,6 +51,8 @@ Como usar:
 - [ ] Lancamento a pagar persiste e aparece na tabela
 - [ ] Troca de status (pendente/quitado etc.) funciona
 - [ ] Cards financeiros atualizam apos alteracoes
+- [ ] Baixa salva `paid_at`; faturamento mensal usa a data da baixa no fuso `America/Sao_Paulo`
+- [ ] Vencimento separa pagamento de situacao temporal e exclui vencidos da janela de hoje ate hoje + 7 dias
 
 ## 7) Equipes
 
@@ -55,6 +60,7 @@ Como usar:
 - [ ] Filtros de area/funcao/status funcionam
 - [ ] Card de detalhe abre sem erro
 - [ ] Dados persistem conforme estrategia atual da sprint
+- [ ] Com sessao Supabase, lista consulta `equipe`; sem sessao/cache, nao exibe zero como total confirmado
 
 ## 8) Estoque
 
@@ -76,6 +82,17 @@ Como usar:
 - [ ] Nao ha erro JS ao abrir dashboard
 - [ ] Grafico renderiza
 - [ ] Sem inconsistencias visuais apos refresh
+- [ ] Seletor mostra seis meses terminados no mes selecionado
+- [ ] Falha de sincronizacao/cache local nao e apresentado como dado confirmado
+- [ ] Lucro previsto/custos sem fonte e exibido como indisponivel, nao como zero
+
+## Validacao local da camada de metricas
+
+- [ ] `node --test tests/metrics.test.js`
+- [ ] `node --check` em `metrics.js`, `app-part1.js`, `app-part2.js` e `crud.js`
+- [ ] Aplicar `20261008000111_metric_inputs.sql` apenas em ambiente autorizado antes de validar persistencia
+- [ ] Usar fixtures sanitizadas; os registros citados no relatorio original nao foram identificados no repositorio
+- [ ] Nao executar `supabase/seed.sql` para esta validacao
 
 ---
 

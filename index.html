@@ -94,7 +94,7 @@
       <div id="register-form" style="display:none">
         <div class="form-group"><label class="form-label">Nome completo</label><div class="form-input-icon"><i class="ti ti-user"></i><input id="register-nome" class="form-input" type="text" placeholder="Carlos Eduardo Reis"></div></div>
         <div class="form-group"><label class="form-label">E-mail empresarial</label><div class="form-input-icon"><i class="ti ti-mail"></i><input id="register-email" class="form-input" type="email" placeholder="carlos@suaempresa.com.br"></div></div>
-        <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input id="register-empresa" class="form-input" type="text" placeholder="Reis Obras e Serviços Ltda"></div></div>
+        <div class="form-group"><label class="form-label">Nome da empresa</label><div class="form-input-icon"><i class="ti ti-building"></i><input id="register-empresa" class="form-input" type="text" placeholder="Nome da sua empresa"></div></div>
         <div class="form-group"><label class="form-label">Telefone</label><div class="form-input-icon"><i class="ti ti-phone"></i><input id="register-telefone" name="register-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-0000" maxlength="15" oninput="onRegisterPhoneInput(this)" onpaste="onRegisterPhonePaste(event)"></div></div>
         <div class="form-group"><label class="form-label">Senha</label><div class="form-input-icon"><i class="ti ti-lock"></i><input id="register-senha" class="form-input" type="password" placeholder="" autocomplete="new-password"></div></div>
         <button id="btn-register" type="button" class="btn-login" onclick="registerUser()">Criar conta grátis</button>
@@ -268,8 +268,7 @@
             <p id="dash-metrics-meta">Resumo operacional</p>
           </div>
           <div class="page-header-right">
-            <select class="filter-select" style="font-size:12px">
-              <option>Junho 2025</option><option>Maio 2025</option><option>Abril 2025</option>
+            <select id="dash-period" class="filter-select" style="font-size:12px" onchange="onDashboardPeriodChange()">
             </select>
           </div>
         </div>
@@ -285,132 +284,89 @@
         <div class="stats-grid">
           <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Ativas</div>
-            <div class="stat-value" id="dash-obras-ativas-value" style="color:var(--petrol-light)">18</div>
-            <div class="stat-sub" id="dash-obras-ativas-sub"><span class="up">↑ 3</span> este mês</div>
+            <div class="stat-value" id="dash-obras-ativas-value" style="color:var(--petrol-light)">—</div>
+            <div class="stat-sub" id="dash-obras-ativas-sub">Carregando dados…</div>
             <i class="ti ti-building-factory-2 stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--red)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Atrasadas</div>
-            <div class="stat-value" id="dash-obras-atrasadas-value" style="color:var(--red)">4</div>
-            <div class="stat-sub" id="dash-obras-atrasadas-sub"><span class="down">↑ 1</span> desde ontem</div>
+            <div class="stat-value" id="dash-obras-atrasadas-value" style="color:var(--red)">—</div>
+            <div class="stat-sub" id="dash-obras-atrasadas-sub">Carregando dados…</div>
             <i class="ti ti-alert-circle stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--green)">
             <div class="stat-label">Faturamento Mensal</div>
-            <div class="stat-value" id="dash-faturamento-mensal-value" style="color:var(--green)">R$287k</div>
-            <div class="stat-sub" id="dash-faturamento-mensal-sub"><span class="up">↑ 18%</span> vs mês anterior</div>
+            <div class="stat-value" id="dash-faturamento-mensal-value" style="color:var(--green)">—</div>
+            <div class="stat-sub" id="dash-faturamento-mensal-sub">Carregando dados…</div>
             <i class="ti ti-cash stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:#A76EF6">
             <div class="stat-label">Lucro Previsto</div>
-            <div class="stat-value" id="dash-lucro-previsto-value" style="color:#A76EF6">R$94k</div>
-            <div class="stat-sub" id="dash-lucro-previsto-sub"><span class="up">32.7%</span> margem</div>
+            <div class="stat-value" id="dash-lucro-previsto-value" style="color:#A76EF6">—</div>
+            <div class="stat-sub" id="dash-lucro-previsto-sub">Custos previstos indisponíveis</div>
             <i class="ti ti-trending-up stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
             <div class="stat-label">Orç. Pendentes</div>
-            <div class="stat-value" id="dash-orc-pendentes-value" style="color:var(--orange)">9</div>
-            <div class="stat-sub" id="dash-orc-pendentes-sub">R$ 412k em aberto</div>
+            <div class="stat-value" id="dash-orc-pendentes-value" style="color:var(--orange)">—</div>
+            <div class="stat-sub" id="dash-orc-pendentes-sub">Carregando dados…</div>
             <i class="ti ti-file-dollar stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
             <div class="stat-label">Equipes em Campo</div>
-            <div class="stat-value" id="dash-equipes-campo-value" style="color:var(--petrol-light)">0</div>
-            <div class="stat-sub" id="dash-equipes-campo-sub">0 técnicos ativos</div>
+            <div class="stat-value" id="dash-equipes-campo-value" style="color:var(--petrol-light)">—</div>
+            <div class="stat-sub" id="dash-equipes-campo-sub">Carregando dados…</div>
             <i class="ti ti-hard-hat stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
             <div class="stat-label">Contas Vencendo</div>
-            <div class="stat-value" id="dash-contas-vencendo-value" style="color:var(--red)">R$43k</div>
-            <div class="stat-sub" id="dash-contas-vencendo-sub">Próximos 7 dias</div>
+            <div class="stat-value" id="dash-contas-vencendo-value" style="color:var(--red)">—</div>
+            <div class="stat-sub" id="dash-contas-vencendo-sub">Carregando dados…</div>
             <i class="ti ti-calendar-due stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
             <div class="stat-label">A Receber</div>
-            <div class="stat-value" id="dash-a-receber-value" style="color:var(--green)">R$168k</div>
-            <div class="stat-sub" id="dash-a-receber-sub">12 parcelas em aberto</div>
+            <div class="stat-value" id="dash-a-receber-value" style="color:var(--green)">—</div>
+            <div class="stat-sub" id="dash-a-receber-sub">Carregando dados…</div>
             <i class="ti ti-receipt stat-icon"></i>
           </div>
           <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('estoque',null)">
             <div class="stat-label">Estoque Crítico</div>
-            <div class="stat-value" id="dash-estoque-critico-value" style="color:var(--orange)">0</div>
-            <div class="stat-sub" id="dash-estoque-critico-sub">0 item(ns) abaixo do mínimo</div>
+            <div class="stat-value" id="dash-estoque-critico-value" style="color:var(--orange)">—</div>
+            <div class="stat-sub" id="dash-estoque-critico-sub">Carregando dados…</div>
             <i class="ti ti-package-import stat-icon"></i>
           </div>
         </div>
 
         <div class="grid-2" style="margin-bottom:20px">
           <div class="card">
-            <div class="section-hdr"><h3>Faturamento Mensal</h3><span style="font-size:11px;color:var(--text-muted)">Jan–Jun 2025</span></div>
+            <div class="section-hdr"><h3>Faturamento Mensal</h3><span id="chart-period-label" style="font-size:11px;color:var(--text-muted)">Carregando…</span></div>
             <div style="height:160px;display:flex;align-items:flex-end;gap:5px;padding-top:10px" id="chart-fat"></div>
             <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--text-muted)" id="chart-labels"></div>
           </div>
           <div class="card">
             <div class="section-hdr"><h3>Status das Obras</h3></div>
-            <div style="display:flex;flex-direction:column;gap:10px;padding-top:8px">
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Em andamento</span><span style="color:var(--petrol-light)">56%</span></div>
-                <div class="progress"><div class="progress-fill" style="width:56%;background:var(--petrol-light)"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Orçamento</span><span style="color:var(--orange)">22%</span></div>
-                <div class="progress"><div class="progress-fill" style="width:22%;background:var(--orange)"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Finalizadas</span><span style="color:var(--green)">14%</span></div>
-                <div class="progress"><div class="progress-fill" style="width:14%;background:var(--green)"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>Atrasadas</span><span style="color:var(--red)">8%</span></div>
-                <div class="progress"><div class="progress-fill" style="width:8%;background:var(--red)"></div></div>
-              </div>
-            </div>
+            <div id="dash-obras-status" style="display:flex;flex-direction:column;gap:10px;padding-top:8px"></div>
           </div>
         </div>
 
         <div class="grid-2" style="margin-bottom:20px">
           <div class="card">
             <div class="section-hdr"><h3>Últimas Obras</h3><button onclick="navigate('obras',null)">Ver todas →</button></div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <div onclick="openObraDetail('OB-0031')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
-                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#1B4F6B,#2176A3)">CH</div>
-                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reforma Comercial Horizonte</div><div style="font-size:11px;color:var(--text-muted)">OB-0031 · Prazo: 28/06</div></div>
-                <span class="badge badge-info"><span class="badge-dot"></span>Andamento</span>
-              </div>
-              <div onclick="openObraDetail('OB-0030')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
-                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#4A1B8F,#7B3FC4)">GI</div>
-                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Instalação Elétrica Inova</div><div style="font-size:11px;color:var(--text-muted)">OB-0030 · Prazo: 15/06</div></div>
-                <span class="badge badge-danger"><span class="badge-dot"></span>Atrasada</span>
-              </div>
-              <div onclick="openObraDetail('OB-0029')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;transition:var(--transition)" onmouseover="this.style.borderColor='var(--border2)'" onmouseout="this.style.borderColor='var(--border)'">
-                <div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">TF</div>
-                <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Manutenção Preventiva TechFix</div><div style="font-size:11px;color:var(--text-muted)">OB-0029 · Prazo: 30/06</div></div>
-                <span class="badge badge-success"><span class="badge-dot"></span>Concluída</span>
-              </div>
-            </div>
+            <div id="dash-recent-works" style="display:flex;flex-direction:column;gap:8px"><div class="muted">Aguardando sincronização.</div></div>
           </div>
           <div class="card">
-            <div class="section-hdr"><h3>Tarefas Pendentes</h3><button>Ver todas →</button></div>
-            <div class="checklist" id="dash-tasks">
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Enviar orçamento — Construtora ABC</span></div>
-              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Aprovar NF #3847 — R$ 12.400</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Agendar visita técnica — cliente novo</span></div>
-              <div class="check-item" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Pagar fornecedor Hidrobom — vence hoje</span></div>
-              <div class="check-item done" onclick="toggleCheck(this)"><div class="check-box"></div><span class="check-label">Atualizar status OB-0031</span></div>
-            </div>
+            <div class="section-hdr"><h3>Tarefas Pendentes</h3></div>
+            <div class="muted">A lista de tarefas ainda não possui fonte de dados integrada.</div>
           </div>
         </div>
 
         <div class="card">
-          <div class="section-hdr"><h3>Clientes Recentes</h3><button onclick="navigate('clientes',null)">Ver todos →</button></div>
+          <div class="section-hdr"><h3>Clientes</h3><button onclick="navigate('clientes',null)">Ver todos →</button></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Cliente</th><th>Tipo</th><th>Obras</th><th>Total</th><th>Último Contato</th></tr></thead>
-              <tbody>
-                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar">CH</div><div><div class="bold">Construtora Horizonte</div><div style="font-size:11px;color:var(--text-muted)">(11) 3847-2000</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">8 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 892k</span></td><td class="muted">Hoje</td></tr>
-                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:linear-gradient(135deg,#4A1B8F,#7B3FC4)">GI</div><div><div class="bold">Grupo Inova Obras</div><div style="font-size:11px;color:var(--text-muted)">(11) 9847-3020</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">5 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 456k</span></td><td class="muted">Ontem</td></tr>
-                <tr onclick="navigate('clientes',null)"><td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:linear-gradient(135deg,#0F6E56,#1D9E75)">TF</div><div><div class="bold">TechFix Soluções</div><div style="font-size:11px;color:var(--text-muted)">(11) 9234-5678</div></div></div></td><td class="muted">CNPJ</td><td><span class="badge badge-info">3 obras</span></td><td><span class="profit-up"><i class="ti ti-trending-up"></i>R$ 187k</span></td><td class="muted">3 dias</td></tr>
-              </tbody>
+              <thead><tr><th>Cliente</th><th>Tipo</th><th>Obras</th><th>Valor contratado</th><th>Status</th></tr></thead>
+              <tbody id="dash-recent-clients"><tr><td colspan="5" class="muted" style="text-align:center">Aguardando sincronização.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -420,7 +376,7 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Gestão de Obras</h2>
-            <p>18 obras ativas · 4 atrasadas</p>
+            <p id="obras-summary">Carregando obras…</p>
           </div>
           <div class="page-header-right">
             <div class="tabs" style="margin:0">
@@ -474,13 +430,13 @@
         <div class="card" style="margin-bottom:16px">
           <div class="info-grid">
             <div class="info-item"><div class="lbl">Responsável</div><div class="val" id="obra-detail-resp">Diego Santos</div></div>
-            <div class="info-item"><div class="lbl">Data de Início</div><div class="val">03/03/2025</div></div>
+            <div class="info-item"><div class="lbl">Data de Início</div><div class="val">Não registrada</div></div>
             <div class="info-item"><div class="lbl">Prazo</div><div class="val red" id="obra-detail-prazo">28/06/2025 ⚠</div></div>
-            <div class="info-item"><div class="lbl">Prioridade</div><div class="val"><span class="badge badge-danger">Alta</span></div></div>
+            <div class="info-item"><div class="lbl">Prioridade</div><div class="val">Não informada</div></div>
             <div class="info-item"><div class="lbl">Valor Vendido</div><div class="val blue" id="obra-detail-valor">R$ 148.000</div></div>
-            <div class="info-item"><div class="lbl">Custo Previsto</div><div class="val">R$ 98.000</div></div>
-            <div class="info-item"><div class="lbl">Lucro Previsto</div><div class="val green">R$ 50.000</div></div>
-            <div class="info-item"><div class="lbl">Margem</div><div class="val green">33,8%</div></div>
+            <div class="info-item"><div class="lbl">Custo Previsto</div><div class="val" id="obra-detail-custo">Não informado</div></div>
+            <div class="info-item"><div class="lbl">Lucro Previsto</div><div class="val" id="obra-detail-lucro">Não calculável</div></div>
+            <div class="info-item"><div class="lbl">Margem</div><div class="val" id="obra-detail-margem">Não calculável</div></div>
           </div>
           <div style="margin-top:10px">
             <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span>Progresso geral</span><span id="obra-progress-value" style="color:var(--petrol-light);font-weight:600">0%</span></div>
@@ -515,14 +471,11 @@
 
         <div class="card">
           <div class="section-hdr"><h3><i class="ti ti-cash" style="font-size:14px;color:var(--petrol-light)"></i> Financeiro da Obra</h3></div>
+          <div id="obra-finance-meta" class="muted" style="margin-bottom:8px;font-size:12px">Carregando lançamentos da obra…</div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Parcela</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr><td class="mono">#1</td><td>Sinal (30%)</td><td class="bold" style="color:var(--green)">R$ 44.400</td><td class="muted">03/03/2025</td><td><span class="badge badge-success">Pago</span></td></tr>
-                <tr><td class="mono">#2</td><td>Medição 1 (40%)</td><td class="bold" style="color:var(--orange)">R$ 59.200</td><td class="muted">10/06/2025</td><td><span class="badge badge-warning">Pendente</span></td></tr>
-                <tr><td class="mono">#3</td><td>Entrega final (30%)</td><td class="bold" style="color:var(--text-muted)">R$ 44.400</td><td class="muted">28/06/2025</td><td><span class="badge badge-neutral">Futuro</span></td></tr>
-              </tbody>
+              <tbody id="obra-finance-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -532,7 +485,7 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Orçamentos</h2>
-            <p>9 pendentes · R$ 412k em propostas abertas</p>
+            <p id="orc-summary">Carregando orçamentos…</p>
           </div>
           <div class="page-header-right">
             <button class="btn btn-secondary btn-sm"><i class="ti ti-database"></i>Banco de Serviços</button>
@@ -554,10 +507,10 @@
         </div>
 
         <div class="card">
-          <div class="section-hdr"><h3><i class="ti ti-file-invoice" style="font-size:14px;color:var(--petrol-light)"></i> Preview — ORC-2847 · Reforma Elétrica Completa</h3>
+          <div class="section-hdr"><h3><i class="ti ti-file-invoice" style="font-size:14px;color:var(--petrol-light)"></i> Exemplo local de orçamento — não representa um registro persistido</h3>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-secondary btn-sm" onclick="showToast('PDF gerado com sucesso!','success')"><i class="ti ti-file-type-pdf"></i>PDF</button>
-              <button class="btn btn-primary btn-sm" onclick="showToast('Orçamento enviado ao cliente!','success')"><i class="ti ti-send"></i>Enviar</button>
+              <button class="btn btn-secondary btn-sm" disabled title="Exemplo local, sem registro persistido"><i class="ti ti-file-type-pdf"></i>PDF</button>
+              <button class="btn btn-primary btn-sm" disabled title="Exemplo local, sem registro persistido"><i class="ti ti-send"></i>Enviar</button>
             </div>
           </div>
 
@@ -565,17 +518,17 @@
             <div style="display:flex;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
               <div>
                 <div style="font-size:18px;font-weight:800;letter-spacing:-0.02em;margin-bottom:2px">ORÇAMENTO</div>
-                <div style="font-family:var(--mono);font-size:12px;color:var(--petrol-light)">#ORC-2847</div>
+                <div style="font-family:var(--mono);font-size:12px;color:var(--petrol-light)">#EXEMPLO-LOCAL</div>
               </div>
               <div style="text-align:right">
                 <div style="font-size:13px;font-weight:700">REIS FLOW Serviços</div>
                 <div style="font-size:11px;color:var(--text-muted)">CNPJ: 12.345.678/0001-00</div>
-                <div style="font-size:11px;color:var(--text-muted)">Validade: 15/07/2025</div>
+                <div style="font-size:11px;color:var(--text-muted)">Validade: demonstrativa</div>
               </div>
             </div>
             <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:14px;font-size:13px">
-              <span style="color:var(--text-muted)">Cliente: </span><span style="font-weight:600">Construtora Horizonte Ltda</span>
-              <span style="margin-left:20px;color:var(--text-muted)">Obra: </span><span style="font-weight:600">Reforma Comercial Sede SP</span>
+              <span style="color:var(--text-muted)">Cliente: </span><span style="font-weight:600">Cliente de demonstração</span>
+              <span style="margin-left:20px;color:var(--text-muted)">Obra: </span><span style="font-weight:600">Obra de demonstração</span>
             </div>
 
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);display:grid;grid-template-columns:1fr 80px 100px 90px;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px">
@@ -585,17 +538,19 @@
             <div style="font-size:13px;display:flex;flex-direction:column;gap:6px" id="orc-preview-items"></div>
 
             <div class="budget-total-row">
-              <div class="total-item"><div class="tl">Subtotal</div><div class="tv">R$ 89.200</div></div>
-              <div class="total-item"><div class="tl">Desconto</div><div class="tv" style="color:var(--red)">-R$ 2.000</div></div>
-              <div class="total-item"><div class="tl">Lucro (32%)</div><div class="tv tv-green">R$ 28.000</div></div>
-              <div class="total-item"><div class="tl">TOTAL</div><div class="tv tv-blue" style="font-size:20px">R$ 87.200</div></div>
+              <div class="total-item"><div class="tl">Custos dos itens</div><div class="tv" id="orc-preview-costs">—</div></div>
+              <div class="total-item"><div class="tl">Subtotal de venda</div><div class="tv" id="orc-preview-subtotal">—</div></div>
+              <div class="total-item"><div class="tl">Deslocamento</div><div class="tv" id="orc-preview-displacement">—</div></div>
+              <div class="total-item"><div class="tl">Desconto</div><div class="tv" id="orc-preview-discount" style="color:var(--red)">—</div></div>
+              <div class="total-item"><div class="tl">Lucro (margem-alvo 32%)</div><div class="tv tv-green" id="orc-preview-profit">—</div></div>
+              <div class="total-item"><div class="tl">TOTAL</div><div class="tv tv-blue" id="orc-preview-total" style="font-size:20px">—</div></div>
             </div>
           </div>
 
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);padding:0 4px">
-            <span><i class="ti ti-calendar" style="margin-right:3px"></i>Validade: 30 dias</span>
+            <span><i class="ti ti-calendar" style="margin-right:3px"></i>Validade demonstrativa</span>
             <span><i class="ti ti-credit-card" style="margin-right:3px"></i>Condições: 30/60/90 dias</span>
-            <span><i class="ti ti-map-pin" style="margin-right:3px"></i>Deslocamento incluído</span>
+            <span><i class="ti ti-map-pin" style="margin-right:3px"></i>Deslocamento: R$ 0,00</span>
             <span><i class="ti ti-signature" style="margin-right:3px;color:var(--petrol-light)"></i>Assinatura digital disponível</span>
           </div>
         </div>
@@ -621,7 +576,7 @@
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Cliente</th><th>Documento</th><th>Telefone</th><th>Obras</th><th>Total Faturado</th><th>Status</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Documento</th><th>Telefone</th><th>Obras</th><th>Valor contratado</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody id="cli-tbody"></tbody>
           </table>
         </div>
@@ -631,7 +586,7 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Financeiro</h2>
-            <p>Controle de caixa, recebíveis e contas a pagar</p>
+            <p id="fin-data-sync-state">Controle de caixa, recebíveis e contas a pagar · aguardando sincronização</p>
           </div>
           <div class="page-header-right">
             <button class="btn btn-secondary btn-sm" onclick="showToast('Exportando relatório...','success')"><i class="ti ti-download"></i>Exportar</button>
@@ -789,9 +744,9 @@
           </div>
         </div>
 
-        <div class="alert alert-warning" style="margin-bottom:16px">
+        <div class="alert alert-warning" id="estoque-critical-alert" style="margin-bottom:16px;display:none">
           <i class="ti ti-alert-triangle"></i>
-          <div><div class="alert-title">8 itens abaixo do estoque mínimo</div><div class="alert-desc">Revise e faça novos pedidos aos fornecedores</div></div>
+          <div><div class="alert-title" id="estoque-critical-title"></div><div class="alert-desc">Revise e faça novos pedidos aos fornecedores</div></div>
         </div>
 
         <div class="filters-bar">
@@ -865,11 +820,11 @@
           <div class="config-column">
             <section class="card config-panel" id="cfg-empresa">
               <div class="section-hdr"><h3><i class="ti ti-building" style="font-size:14px;color:var(--petrol-light)"></i> Dados da Empresa</h3></div>
-              <div class="field"><label>Razão Social</label><input value="Reis Obras e Serviços Ltda" type="text"></div>
-              <div class="field"><label>CNPJ</label><input value="12.345.678/0001-00" type="text"></div>
-              <div class="field"><label>E-mail</label><input value="contato@reisflow.com.br" type="text"></div>
-              <div class="field"><label>Telefone</label><input value="(11) 3847-2000" type="text"></div>
-              <div class="field"><label>Endereço</label><input value="Av. Paulista, 1000 — São Paulo, SP" type="text"></div>
+              <div class="field"><label>Razão Social</label><input type="text" placeholder="Razão social da empresa"></div>
+              <div class="field"><label>CNPJ</label><input type="text" placeholder="CNPJ"></div>
+              <div class="field"><label>E-mail</label><input type="text" placeholder="E-mail corporativo"></div>
+              <div class="field"><label>Telefone</label><input type="text" placeholder="Telefone comercial"></div>
+              <div class="field"><label>Endereço</label><input type="text" placeholder="Endereço da empresa"></div>
               <button class="btn btn-primary btn-sm" onclick="showToast('Dados salvos com sucesso!','success')"><i class="ti ti-check"></i>Salvar alterações</button>
             </section>
 
@@ -1087,15 +1042,19 @@
 
     <div class="orc-summary-panel">
       <div class="orc-summary-grid">
-        <div class="field orc-field" style="margin:0"><label>Margem (%)</label><input value="30" id="modal-margem" type="number" oninput="calcTotals()"></div>
+        <div class="field orc-field" style="margin:0"><label>Margem-alvo (%)</label><input value="30" id="modal-margem" type="number" min="0" max="99.99" step="0.01" oninput="calcTotals()"></div>
         <div class="field orc-field" style="margin:0"><label>Desconto (R$)</label><input value="0" id="modal-desconto" type="number" oninput="calcTotals()"></div>
         <div class="field orc-field" style="margin:0"><label>Deslocamento (R$)</label><input value="0" id="modal-desloc" type="number" oninput="calcTotals()"></div>
       </div>
       <div class="orc-summary-totals">
-        <span class="orc-total-item">Subtotal: <strong id="modal-subtotal">R$ 0</strong></span>
-        <span class="orc-total-item orc-total-profit">Lucro: <strong id="modal-lucro">R$ 0</strong></span>
+        <span class="orc-total-item">Custos dos itens: <strong id="modal-costs">R$ 0</strong></span>
+        <span class="orc-total-item">Subtotal de venda: <strong id="modal-subtotal">R$ 0</strong></span>
+        <span class="orc-total-item">Deslocamento: <strong id="modal-displacement">R$ 0</strong></span>
+        <span class="orc-total-item">Desconto: <strong id="modal-discount">R$ 0</strong></span>
+        <span class="orc-total-item orc-total-profit">Lucro / margem efetiva: <strong id="modal-lucro">R$ 0 · 0%</strong></span>
         <span class="orc-total-item orc-total-final">Total: <strong id="modal-total">R$ 0</strong></span>
       </div>
+      <div id="orc-calculation-error" class="field-hint" role="status" style="display:none;color:var(--red);margin-top:8px"></div>
     </div>
 
     <div class="field orc-field" style="margin-top:16px"><label>Condições de pagamento</label><input placeholder="Ex: 30% entrada, 70% na entrega"></div>
@@ -1149,6 +1108,10 @@
       <div class="info-item"><div class="lbl">Cliente</div><div class="val" id="orc-detail-client">-</div></div>
       <div class="info-item"><div class="lbl">Valor</div><div class="val" id="orc-detail-valor">-</div></div>
       <div class="info-item"><div class="lbl">Margem</div><div class="val" id="orc-detail-margem">-</div></div>
+      <div class="info-item"><div class="lbl">Custo dos itens</div><div class="val" id="orc-detail-custo">-</div></div>
+      <div class="info-item"><div class="lbl">Deslocamento</div><div class="val" id="orc-detail-deslocamento">-</div></div>
+      <div class="info-item"><div class="lbl">Desconto</div><div class="val" id="orc-detail-desconto">-</div></div>
+      <div class="info-item"><div class="lbl">Lucro (venda − custos)</div><div class="val" id="orc-detail-lucro">-</div></div>
       <div class="info-item"><div class="lbl">Validade</div><div class="val" id="orc-detail-validade">-</div></div>
       <div class="info-item"><div class="lbl">Status</div><div class="val" id="orc-detail-status">-</div></div>
     </div>
@@ -1216,7 +1179,7 @@
       <div class="info-item"><div class="lbl">Documento</div><div class="val" id="cliente-detail-doc">-</div></div>
       <div class="info-item"><div class="lbl">Telefone</div><div class="val" id="cliente-detail-tel">-</div></div>
       <div class="info-item"><div class="lbl">Obras</div><div class="val" id="cliente-detail-obras">-</div></div>
-      <div class="info-item"><div class="lbl">Total</div><div class="val" id="cliente-detail-total">-</div></div>
+      <div class="info-item"><div class="lbl">Valor contratado</div><div class="val" id="cliente-detail-total">-</div></div>
       <div class="info-item"><div class="lbl">Status</div><div class="val" id="cliente-detail-status">-</div></div>
     </div>
     <div class="section-hdr" style="margin-top:18px"><h3 style="margin:0;font-size:14px">Indicadores do Cliente (pré-dashboard)</h3></div>
@@ -1528,12 +1491,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="assets/js/supabase-config.js?v=20260703"></script>
+<script src="assets/js/supabase-config.js?v=20261008-2"></script>
+<script src="assets/js/tenant-storage.js?v=20261009-2"></script>
 <script src="assets/js/theme.js?v=20260703"></script>
-<script src="assets/js/app-part1.js?v=20260736-2"></script>
-<script src="assets/js/app-part2.js?v=20260755-2"></script>
+<script src="assets/js/metrics.js?v=20261008-1"></script>
+<script src="assets/js/app-part1.js?v=20261009-1"></script>
+<script src="assets/js/app-part2.js?v=20261009-1"></script>
 <script src="assets/js/protection.js?v=20260703"></script>
-<script src="assets/js/auth.js?v=20260806-3"></script>
-<script src="assets/js/crud.js?v=20260723-10"></script>
+<script src="assets/js/auth.js?v=20261009-1"></script>
+<script src="assets/js/crud.js?v=20261009-1"></script>
 </body>
 </html>

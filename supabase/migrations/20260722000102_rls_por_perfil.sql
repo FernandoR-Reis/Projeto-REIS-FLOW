@@ -143,4 +143,33 @@ for all to authenticated
 using (public.app_has_role(array['admin','gestor','tecnico','operador']::text[]))
 with check (public.app_has_role(array['admin','gestor','tecnico','operador']::text[]));
 
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'clientes', 'obras', 'orcamentos', 'orcamento_itens',
+    'financeiro_receber', 'financeiro_pagar', 'equipe',
+    'estoque_itens', 'fornecedores', 'estoque_movimentos',
+    'obra_etapas', 'obra_historico', 'audit_log'
+  ] loop
+    execute format('drop policy if exists bootstrap_deny_authenticated on public.%I', table_name);
+  end loop;
+end;
+$$;
+
+create policy bootstrap_deny_authenticated on public.clientes as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obras as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.orcamentos as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.orcamento_itens as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.financeiro_receber as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.financeiro_pagar as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.equipe as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.estoque_itens as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.fornecedores as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.estoque_movimentos as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obra_etapas as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.obra_historico as restrictive for all to authenticated using (false) with check (false);
+create policy bootstrap_deny_authenticated on public.audit_log as restrictive for all to authenticated using (false) with check (false);
+
 commit;

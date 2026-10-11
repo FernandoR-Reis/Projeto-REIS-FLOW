@@ -173,16 +173,15 @@ function normalizeUsuarioSistema(item, index = 0) {
     email: String(item?.email || '').trim(),
     perfil,
     status,
-    senhaTemporaria: String(item?.senhaTemporaria || item?.senha_temporaria || '').trim(),
     ultimoAcesso: item?.ultimoAcesso || item?.ultimo_acesso || null,
-    empresa: String(item?.empresa || 'REIS FLOW').trim(),
+    empresa: String(item?.empresa || '').trim(),
     convitesEnviados: Number(item?.convitesEnviados || item?.convites_enviados || 0) || 0
   };
 }
 
 function saveUsuariosSistemaToStorage() {
   try {
-    localStorage.setItem(USUARIOS_SISTEMA_STORAGE_KEY, JSON.stringify(usuariosSistemaData || []));
+    window.ReisFlowTenantStorage?.setItem(USUARIOS_SISTEMA_STORAGE_KEY, JSON.stringify(usuariosSistemaData || []));
   } catch {
     // fallback in memory
   }
@@ -207,16 +206,21 @@ async function syncUsuarioSistemaIdentityFromAuth() {
   if (!authUserId || !window.db?.from) return false;
 
   try {
-    const { data: perfil } = await db
-      .from('profiles')
+    const [{ data: perfil, error: profileError }, { data: cargoData, error: roleError }, { data: sessionData, error: sessionError }] = await Promise.all([
+      db.from('profiles')
       .select('id, nome, cargo')
       .eq('id', authUserId)
-      .maybeSingle();
-
-    const { data: sessionData } = await db.auth.getSession();
-    const email = String(sessionData?.session?.user?.email || '').trim();
+      .maybeSingle(),
+      db.rpc('app_user_role'),
+      db.auth.getSession()
+    ]);
+    if (profileError) throw profileError;
+    if (roleError) throw roleError;
+    if (sessionError) throw sessionError;
+    const sessionUser = sessionData?.session?.user;
+    const email = String(sessionUser?.email || '').trim();
     const nome = String(perfil?.nome || email || 'Usuário').trim();
-    const cargo = normalizeRole(perfil?.cargo || 'operador');
+    const cargo = normalizeRole(cargoData || 'operador');
     const equipe = (Array.isArray(equipeData) ? equipeData : []).find((member) => {
       const memberEmail = String(member?.email || '').trim().toLowerCase();
       const memberName = String(member?.name || member?.nome || '').trim().toLowerCase();
@@ -231,7 +235,7 @@ async function syncUsuarioSistemaIdentityFromAuth() {
       email: email || null,
       perfil: cargo === 'admin' ? 'Administrador' : cargo === 'gestor' ? 'Gerente' : cargo === 'financeiro' ? 'Financeiro' : 'Visualizador',
       status: 'ativo',
-      empresa: 'REIS FLOW',
+      empresa: String(sessionUser?.user_metadata?.empresa || '').trim(),
       ultimo_acesso: new Date().toISOString(),
       convites_enviados: 0
     };
@@ -242,7 +246,8 @@ async function syncUsuarioSistemaIdentityFromAuth() {
 
     if (error) throw error;
     return true;
-  } catch {
+  } catch (error) {
+    console.error('Falha ao sincronizar a identidade do usuario autenticado.', error);
     return false;
   }
 }
@@ -260,7 +265,7 @@ function seedUsuariosSistemaFromEquipes() {
       email: '',
       perfil: 'Visualizador',
       status: 'convite_pendente',
-      empresa: 'REIS FLOW',
+      empresa: '',
       convitesEnviados: 0
     }, index));
     existingByEquipeId.add(teamId);
@@ -277,7 +282,7 @@ async function syncUsuariosSistemaFromSupabase(options = {}) {
   try {
     const { data, error } = await db
       .from('usuarios_sistema')
-      .select('id, equipe_id, auth_user_id, nome, email, perfil, status, senha_temporaria, ultimo_acesso, empresa, convites_enviados')
+      .select('id, equipe_id, auth_user_id, empresa_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -306,9 +311,8 @@ async function upsertUsuarioSistemaSupabase(item, editId = '') {
       email: String(item?.email || '').trim(),
       perfil: String(item?.perfil || 'Visualizador').trim(),
       status: String(item?.status || 'convite_pendente').trim(),
-      senha_temporaria: String(item?.senhaTemporaria || '').trim() || null,
       ultimo_acesso: item?.ultimoAcesso || null,
-      empresa: String(item?.empresa || 'REIS FLOW').trim(),
+      empresa: String(item?.empresa || '').trim(),
       convites_enviados: Number(item?.convitesEnviados || 0) || 0,
       auth_user_id: item?.authUserId || null
     };
@@ -318,7 +322,7 @@ async function upsertUsuarioSistemaSupabase(item, editId = '') {
         .from('usuarios_sistema')
         .update(payload)
         .eq('id', editId)
-        .select('id, equipe_id, auth_user_id, nome, email, perfil, status, senha_temporaria, ultimo_acesso, empresa, convites_enviados')
+        .select('id, equipe_id, auth_user_id, empresa_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
         .single();
 
       if (error) throw error;
@@ -328,7 +332,7 @@ async function upsertUsuarioSistemaSupabase(item, editId = '') {
     const { data, error } = await db
       .from('usuarios_sistema')
       .insert(payload)
-      .select('id, equipe_id, auth_user_id, nome, email, perfil, status, senha_temporaria, ultimo_acesso, empresa, convites_enviados')
+      .select('id, equipe_id, auth_user_id, empresa_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
       .single();
 
     if (error) throw error;
@@ -348,7 +352,7 @@ async function updateUsuarioSistemaStatusSupabase(id, nextStatus) {
       .from('usuarios_sistema')
       .update({ status: nextStatus })
       .eq('id', id)
-      .select('id, equipe_id, auth_user_id, nome, email, perfil, status, senha_temporaria, ultimo_acesso, empresa, convites_enviados')
+      .select('id, equipe_id, auth_user_id, empresa_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
       .single();
 
     if (error) throw error;
@@ -360,7 +364,7 @@ async function updateUsuarioSistemaStatusSupabase(id, nextStatus) {
 
 function loadUsuariosSistemaFromStorage() {
   try {
-    const raw = localStorage.getItem(USUARIOS_SISTEMA_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(USUARIOS_SISTEMA_STORAGE_KEY);
     if (!raw) {
       seedUsuariosSistemaFromEquipes();
       saveUsuariosSistemaToStorage();
@@ -458,7 +462,7 @@ function populateUsuariosSistema() {
       <td><span class="badge badge-neutral">${item.perfil}</span></td>
       <td>${getUsuarioSistemaStatusLabel(item.status)}</td>
       <td class="muted">${item.ultimoAcesso ? new Date(item.ultimoAcesso).toLocaleString('pt-BR') : 'Sem acesso ainda'}</td>
-      <td class="muted">${item.empresa || 'REIS FLOW'}</td>
+      <td class="muted">${item.empresa || '—'}</td>
       <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-xs" onclick="openEditarUsuarioSistema('${idSafe}')"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-xs" onclick="toggleUsuarioSistemaStatus('${idSafe}')"><i class="ti ti-lock"></i></button></div></td>
     </tr>`;
   });
@@ -529,6 +533,28 @@ function getPermissaoAcessoByEquipeId(equipeId) {
   const id = String(equipeId || '').trim();
   if (!id) return null;
   return (Array.isArray(usuariosSistemaData) ? usuariosSistemaData : []).find((row) => String(row.equipeId || '') === id) || null;
+}
+
+async function salvarAcessoUsuarioViaConvite(member, perfil, status) {
+  if (!window.db?.functions?.invoke) {
+    throw new Error('O servico de convite nao esta disponivel.');
+  }
+
+  const { data, error } = await db.functions.invoke('invite-user', {
+    body: {
+      equipe_id: member.id,
+      nome: member.name,
+      email: member.email,
+      perfil,
+      status
+    }
+  });
+
+  if (error) throw error;
+  if (!data?.ok || !data.row) {
+    throw new Error(data?.error || 'O servidor nao confirmou a atualizacao do acesso.');
+  }
+  return normalizeUsuarioSistema(data.row, 0);
 }
 
 function getPermissaoStatusBadgeByEquipeId(equipeId) {
@@ -637,18 +663,7 @@ async function togglePermissaoEquipeStatus(memberId) {
   }
 
   const nextStatus = currentStatus === 'bloqueado' ? 'ativo' : 'bloqueado';
-  const result = await updateUsuarioSistemaStatusSupabase(acesso.id, nextStatus);
-
-  if (result.ok && result.row) {
-    const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(acesso.id || ''));
-    if (idx >= 0) usuariosSistemaData[idx] = normalizeUsuarioSistema(result.row, idx);
-    saveUsuariosSistemaToStorage();
-    populatePermissoesEquipeModal();
-    showToast(nextStatus === 'bloqueado' ? 'Acesso bloqueado.' : 'Acesso liberado.', 'success');
-    return;
-  }
-
-  if (result.fallback) {
+  if (!await hasSupabaseSession()) {
     const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(acesso.id || ''));
     if (idx >= 0) {
       usuariosSistemaData[idx].status = nextStatus;
@@ -659,7 +674,17 @@ async function togglePermissaoEquipeStatus(memberId) {
     }
   }
 
-  showToast(`Não foi possível alterar acesso: ${result?.error?.message || 'erro desconhecido'}`, 'error');
+  try {
+    const updated = await salvarAcessoUsuarioViaConvite(member, acesso.perfil, nextStatus);
+    const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(acesso.id || ''));
+    if (idx >= 0) usuariosSistemaData[idx] = updated;
+    saveUsuariosSistemaToStorage();
+    populatePermissoesEquipeModal();
+    showToast(nextStatus === 'bloqueado' ? 'Acesso bloqueado.' : 'Acesso liberado.', 'success');
+  } catch (error) {
+    console.error('Falha ao alterar o acesso do membro.', error);
+    showToast(`Nao foi possivel alterar o acesso: ${error?.message || 'erro desconhecido'}`, 'error');
+  }
 }
 
 function onEquipeAcessoChange(value) {
@@ -703,7 +728,7 @@ function loadSystemConfig() {
 
   let parsed = null;
   try {
-    const raw = localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(SYSTEM_CONFIG_STORAGE_KEY);
     parsed = raw ? JSON.parse(raw) : null;
   } catch {
     parsed = null;
@@ -745,7 +770,7 @@ function saveSystemConfig(config) {
 
   window._systemConfig = next;
   try {
-    localStorage.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(next));
+    window.ReisFlowTenantStorage?.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // Falha silenciosa: a UI continua usando a versão em memória.
   }
@@ -1120,7 +1145,7 @@ function replaceEquipeData(items) {
 
 function loadEquipesFromStorageLegacy() {
   try {
-    const raw = localStorage.getItem(EQUIPE_DATA_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(EQUIPE_DATA_STORAGE_KEY);
     if (!raw) {
       for (let i = 0; i < equipeData.length; i += 1) {
         equipeData[i] = normalizeEquipeMember(equipeData[i], i);
@@ -1144,7 +1169,7 @@ function loadEquipesFromStorageLegacy() {
 
 function saveEquipesToStorage() {
   try {
-    localStorage.setItem(EQUIPE_DATA_STORAGE_KEY, JSON.stringify(equipeData || []));
+    window.ReisFlowTenantStorage?.setItem(EQUIPE_DATA_STORAGE_KEY, JSON.stringify(equipeData || []));
   } catch {
     // Falha silenciosa: modulo continua funcional em memoria.
   }
@@ -1190,12 +1215,20 @@ function buildEquipeDbPayload(member, obraId = null) {
 
 async function syncEquipesFromSupabase(options = {}) {
   const { silent = true } = options;
-  if (!window.db?.from) return false;
-
-  const hasSession = await hasSupabaseSession();
-  if (!hasSession) return false;
+  if (!window.db?.from) {
+    equipesLastSyncSource = 'local';
+    equipesSyncError = 'Supabase indisponivel';
+    return false;
+  }
 
   try {
+    const hasSession = await hasSupabaseSession();
+    if (!hasSession) {
+      equipesLastSyncSource = 'local';
+      equipesSyncError = 'sessão Supabase indisponível';
+      return false;
+    }
+
     const { data, error } = await db
       .from('equipe')
       .select('id, nome, area, funcao, telefone, email, diaria, comissao_percentual, status, obras(codigo)')
@@ -1205,10 +1238,12 @@ async function syncEquipesFromSupabase(options = {}) {
 
     replaceEquipeData((data || []).map((row, index) => mapEquipeRowToUi(row, index)));
     equipesLastSyncSource = 'supabase';
+    equipesSyncError = '';
     saveEquipesToStorage();
     return true;
   } catch (error) {
     equipesLastSyncSource = 'local';
+    equipesSyncError = String(error?.message || error || 'erro desconhecido');
     if (!silent) {
       const msg = isFornecedorSupabaseFallbackError(error)
         ? 'Sem sessão ativa no banco. Mantendo equipes locais.'
@@ -1228,13 +1263,10 @@ async function loadEquipesFromStorage(options = {}) {
     return;
   }
 
-  const hasSession = await hasSupabaseSession();
-  if (hasSession) {
-    const synced = await syncEquipesFromSupabase({ silent });
-    if (synced) {
-      populateEquipes();
-      return;
-    }
+  const synced = await syncEquipesFromSupabase({ silent });
+  if (synced) {
+    populateEquipes();
+    return;
   }
 
   loadEquipesFromStorageLegacy();
@@ -1464,9 +1496,35 @@ const fornecedoresData = [];
 let equipesLastSyncSource = 'local';
 let estoqueLastSyncSource = 'local';
 let fornecedoresLastSyncSource = 'local';
+let equipesSyncError = '';
+let estoqueSyncError = '';
+let fornecedoresSyncError = '';
 
-function getSyncStatusSuffix(source) {
-  return source === 'supabase' ? '' : ' · sincronizacao pendente';
+function clearTenantScopedMemory() {
+  [obras, orcamentos, clientes, financRec, financPag, equipeData, estoqueData, fornecedoresData, usuariosSistemaData]
+    .forEach((items) => {
+      items.length = 0;
+    });
+  window._systemConfig = null;
+  window._reisPrimaryDataState = 'idle';
+  window._reisPrimaryDataError = '';
+  equipesLastSyncSource = 'local';
+  estoqueLastSyncSource = 'local';
+  fornecedoresLastSyncSource = 'local';
+  equipesSyncError = '';
+  estoqueSyncError = '';
+  fornecedoresSyncError = '';
+}
+
+window.clearTenantScopedMemory = clearTenantScopedMemory;
+
+function getSyncStatusSuffix(source, error, itemCount) {
+  if (source === 'supabase') return '';
+  if (error) {
+    const reason = String(error).replace(/\s+/g, ' ').slice(0, 90);
+    return ` · falha de sincronização${reason ? ` (${reason})` : ''}; ${itemCount ? 'exibindo cache local' : 'dados indisponíveis'}`;
+  }
+  return ` · ${itemCount ? 'cache local; sincronização pendente' : 'sem confirmação do banco'}`;
 }
 
 const FORNECEDOR_CATEGORY_LABELS = {
@@ -1612,7 +1670,7 @@ function replaceFornecedoresData(items) {
 
 function saveFornecedoresToStorage() {
   try {
-    localStorage.setItem(FORNECEDORES_DATA_STORAGE_KEY, JSON.stringify(fornecedoresData || []));
+    window.ReisFlowTenantStorage?.setItem(FORNECEDORES_DATA_STORAGE_KEY, JSON.stringify(fornecedoresData || []));
   } catch {
     // Falha silenciosa para manter modulo funcional em memoria.
   }
@@ -1637,7 +1695,7 @@ function seedFornecedoresFromEstoque() {
 
 function loadFornecedoresFromStorageLegacy() {
   try {
-    const raw = localStorage.getItem(FORNECEDORES_DATA_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(FORNECEDORES_DATA_STORAGE_KEY);
     if (!raw) {
       fornecedoresData.length = 0;
       seedFornecedoresFromEstoque();
@@ -1669,12 +1727,20 @@ function loadFornecedoresFromStorageLegacy() {
 
 async function syncFornecedoresFromSupabase(options = {}) {
   const { silent = true } = options;
-  if (!window.db?.from) return false;
-
-  const hasSession = await hasSupabaseSession();
-  if (!hasSession) return false;
+  if (!window.db?.from) {
+    fornecedoresLastSyncSource = 'local';
+    fornecedoresSyncError = 'Supabase indisponivel';
+    return false;
+  }
 
   try {
+    const hasSession = await hasSupabaseSession();
+    if (!hasSession) {
+      fornecedoresLastSyncSource = 'local';
+      fornecedoresSyncError = 'sessao Supabase indisponivel';
+      return false;
+    }
+
     const { data, error } = await db
       .from('fornecedores')
       .select('id, nome, categoria, vendedor, telefone, email, cnpj, status')
@@ -1684,10 +1750,12 @@ async function syncFornecedoresFromSupabase(options = {}) {
 
     replaceFornecedoresData((data || []).map((row, index) => mapFornecedorRowToUi(row, index)));
     fornecedoresLastSyncSource = 'supabase';
+    fornecedoresSyncError = '';
     saveFornecedoresToStorage();
     return true;
   } catch (error) {
     fornecedoresLastSyncSource = 'local';
+    fornecedoresSyncError = String(error?.message || error || 'erro desconhecido');
     if (!silent) {
       const msg = isFornecedorSupabaseFallbackError(error)
         ? 'Sem sessão ativa no banco. Mantendo fornecedores locais.'
@@ -1709,15 +1777,12 @@ async function loadFornecedoresFromStorage(options = {}) {
     return;
   }
 
-  const hasSession = await hasSupabaseSession();
-  if (hasSession) {
-    const synced = await syncFornecedoresFromSupabase({ silent });
-    if (synced) {
-      populateFornecedorDatalist();
-      updateFornecedoresSummary();
-      populateFornecedores();
-      return;
-    }
+  const synced = await syncFornecedoresFromSupabase({ silent });
+  if (synced) {
+    populateFornecedorDatalist();
+    updateFornecedoresSummary();
+    populateFornecedores();
+    return;
   }
 
   loadFornecedoresFromStorageLegacy();
@@ -1882,7 +1947,7 @@ function updateFornecedoresSummary() {
   if (!summary) return;
   const total = (Array.isArray(fornecedoresData) ? fornecedoresData : []).length;
   const ativos = (Array.isArray(fornecedoresData) ? fornecedoresData : []).filter((item) => item.status === 'ativo').length;
-  summary.textContent = `${total} fornecedores cadastrados · ${ativos} ativos${getSyncStatusSuffix(fornecedoresLastSyncSource)}`;
+  summary.textContent = `${total} fornecedores cadastrados · ${ativos} ativos${getSyncStatusSuffix(fornecedoresLastSyncSource, fornecedoresSyncError, total)}`;
 }
 
 function populateFornecedorDatalist() {
@@ -2128,6 +2193,16 @@ let estoqueDraftEditId = null;
 let estoqueDraftExpanded = false;
 
 function populateFin() {
+  const stateEl = document.getElementById('fin-data-sync-state');
+  if (stateEl) {
+    if (window._reisPrimaryDataState === 'synced') {
+      stateEl.textContent = 'Controle de caixa, recebíveis e contas a pagar · sincronizado';
+    } else if (window._reisPrimaryDataState === 'error') {
+      stateEl.textContent = `Falha na sincronização financeira: ${String(window._reisPrimaryDataError || 'erro desconhecido').slice(0, 120)} · os dados exibidos podem estar desatualizados`;
+    } else {
+      stateEl.textContent = 'Controle de caixa, recebíveis e contas a pagar · aguardando sincronização';
+    }
+  }
   const filtros = window._finFilters || { search: '', status: 'todos', period: 'todos' };
   const receiveTable = document.getElementById('fin-rec-tbody');
   if (receiveTable) {
@@ -2145,7 +2220,7 @@ function populateFin() {
         <td class="muted">${item.desc}</td>
         <td><span style="font-weight:700;color:var(--green)">${item.valor}</span></td>
         <td class="muted">${item.venc}</td>
-        <td>${statusBadge(item.status)}</td>
+        <td>${renderFinanceStatus(item)}</td>
         <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-xs" onclick="openLancamentoFinanceiro('receber','${refSafe}')"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-xs" onclick="baixarLancamentoFinanceiro('receber','${refSafe}')" ${isQuitado ? 'disabled title="Já recebido"' : ''}><i class="ti ti-check"></i></button></div></td>
       </tr>`;
     });
@@ -2167,13 +2242,26 @@ function populateFin() {
         <td><span class="badge badge-neutral">${item.cat}</span></td>
         <td><span style="font-weight:700;color:var(--red)">${item.valor}</span></td>
         <td class="muted">${item.venc}</td>
-        <td>${statusBadge(item.status)}</td>
+        <td>${renderFinanceStatus(item)}</td>
         <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-xs" onclick="openLancamentoFinanceiro('pagar','${refSafe}')"><i class="ti ti-edit"></i></button><button class="btn btn-ghost btn-xs" onclick="baixarLancamentoFinanceiro('pagar','${refSafe}')" ${isQuitado ? 'disabled title="Já pago"' : ''}><i class="ti ti-check"></i></button></div></td>
       </tr>`;
     });
   }
 
   updateFinanceiroSummary();
+}
+
+function renderFinanceStatus(item) {
+  if (ReisFlowMetrics.getPaymentState(item) === 'quitado') return statusBadge(item.status);
+  const payment = statusBadge('pendente');
+  const temporalState = ReisFlowMetrics.getTemporalState(item);
+  const temporalLabel = {
+    vencido: statusBadge('vencido'),
+    vence_hoje: '<span class="badge badge-warning">Vence hoje</span>',
+    a_vencer: statusBadge('futuro'),
+    sem_vencimento: '<span class="badge badge-neutral">Sem vencimento</span>'
+  }[temporalState];
+  return `${payment} ${temporalLabel}`;
 }
 
 function normalizeFinText(value) {
@@ -2190,27 +2278,27 @@ function matchesFinFilters(item, tipo, filtros) {
   const search = normalizeFinText(filtros?.search || '');
   const status = String(filtros?.status || 'todos').toLowerCase();
   const period = String(filtros?.period || 'todos').toLowerCase();
-  const itemStatus = String(item?.status || '').toLowerCase();
-
   if (status !== 'todos') {
     if (status === 'quitado') {
-      if (!isFinQuitado(itemStatus)) return false;
-    } else if (itemStatus !== status) {
-      return false;
+      if (ReisFlowMetrics.getPaymentState(item) !== 'quitado') return false;
+    } else if (status === 'vencido') {
+      if (ReisFlowMetrics.getTemporalState(item) !== 'vencido') return false;
+    } else if (status === 'futuro') {
+      if (ReisFlowMetrics.getTemporalState(item) !== 'a_vencer') return false;
+    } else if (status === 'pendente') {
+      if (ReisFlowMetrics.getPaymentState(item) !== 'aberto' || ReisFlowMetrics.getTemporalState(item) === 'vencido') return false;
     }
   }
 
-  const vencDate = parseFinanceDate(item?.venc || item?.vencimento || '');
+  const today = ReisFlowMetrics.todayInTimeZone();
+  const dueDate = ReisFlowMetrics.toDateKey(item?.venc || item?.vencimento || '');
+  const difference = dueDate ? ReisFlowMetrics.dayDifference(dueDate, today) : null;
   if (period !== 'todos') {
-    if (!vencDate) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((vencDate.getTime() - today.getTime()) / 86400000);
-
-    if (period === 'hoje' && diffDays !== 0) return false;
-    if (period === '7d' && (diffDays < 0 || diffDays > 7)) return false;
-    if (period === '30d' && (diffDays < 0 || diffDays > 30)) return false;
-    if (period === 'atrasado' && diffDays >= 0) return false;
+    if (difference === null) return false;
+    if (period === 'hoje' && difference !== 0) return false;
+    if (period === '7d' && (difference < 0 || difference > 7)) return false;
+    if (period === '30d' && (difference < 0 || difference > 30)) return false;
+    if (period === 'atrasado' && difference >= 0) return false;
   }
 
   if (!search) return true;
@@ -2235,7 +2323,7 @@ function onFinFiltersChange() {
 }
 
 function getFinanceEventDate(item) {
-  return parseFinanceDate(item?.updatedAt || item?.venc || item?.vencimento || '');
+  return parseFinanceDate(item?.paidAt || item?.paid_at || '');
 }
 
 function isSameMonthYear(date, refDate) {
@@ -2260,12 +2348,12 @@ function updateFinanceiroSummary() {
 
   const saldoSub = document.getElementById('fin-stat-saldo-sub');
   if (saldoSub) {
-    saldoSub.textContent = 'A receber - compromissos - pagos no mês';
+    saldoSub.textContent = 'A receber em aberto - a pagar em aberto';
   }
 
   const pagarSub = document.getElementById('fin-stat-pagar-sub');
   if (pagarSub) {
-    pagarSub.innerHTML = `<span class="down">${formatCurrencyValue(metrics.pagar7dias)}</span> vence em 7 dias`;
+    pagarSub.innerHTML = `<span class="down">${formatCurrencyValue(metrics.pagar7dias)}</span> a pagar · hoje até hoje + 7 dias`;
   }
 }
 
@@ -2279,12 +2367,13 @@ async function baixarLancamentoFinanceiro(tipo, referencia) {
   const newStatus = isReceber ? 'recebido' : 'pago';
 
   try {
-    const { error } = await db.from(table).update({ status: newStatus }).eq('referencia', ref);
+    const paidAt = new Date().toISOString();
+    const { error } = await db.from(table).update({ status: newStatus, paid_at: paidAt }).eq('referencia', ref);
     if (error) throw error;
 
     const targetList = isReceber ? financRec : financPag;
     const idx = targetList.findIndex((item) => String(item.ref || '') === ref);
-    if (idx >= 0) targetList[idx] = { ...targetList[idx], status: newStatus, updatedAt: new Date().toISOString() };
+    if (idx >= 0) targetList[idx] = { ...targetList[idx], status: newStatus, paidAt };
 
     populateFin();
     if (typeof drawFluxo === 'function') drawFluxo();
@@ -2303,7 +2392,16 @@ function populateEquipes() {
   grid.innerHTML = '';
   const members = getFilteredEquipes();
   if (members.length === 0) {
-    grid.innerHTML = '<div class="card" style="grid-column:1 / -1;text-align:center;color:var(--text-muted)">Nenhum membro encontrado com os filtros atuais.</div>';
+    const unavailable = equipesLastSyncSource !== 'supabase' && equipeData.length === 0;
+    const emptyMessage = unavailable
+      ? equipesSyncError
+        ? 'Não foi possível confirmar os dados das equipes no banco.'
+        : 'Aguardando sincronização das equipes.'
+      : equipeData.length === 0
+        ? 'Nenhum profissional cadastrado.'
+        : 'Nenhum membro encontrado com os filtros atuais.';
+    grid.innerHTML = '<div class="card" style="grid-column:1 / -1;text-align:center;color:var(--text-muted)"></div>';
+    grid.firstElementChild.textContent = emptyMessage;
     updateEquipesSummary();
     updateDashboardOperationalStats();
     return;
@@ -2478,6 +2576,10 @@ async function salvarMembroEquipe() {
     showToast('Informe a diária do membro.', 'warning');
     return;
   }
+  if (acesso === 'sim' && !email) {
+    showToast('Informe um e-mail para enviar o convite de acesso.', 'warning');
+    return;
+  }
 
   const member = normalizeEquipeMember({
     id: editId || undefined,
@@ -2516,6 +2618,7 @@ async function salvarMembroEquipe() {
 
   const selectedPerfil = PERFIS_PADRAO_USUARIO.includes(perfilAcesso) ? perfilAcesso : 'Visualizador';
   const existingAcesso = getPermissaoAcessoByEquipeId(sourceMember.id);
+  let accountAccessUpdated = true;
 
   if (acesso === 'sim') {
     const usuarioPayload = normalizeUsuarioSistema({
@@ -2525,20 +2628,12 @@ async function salvarMembroEquipe() {
       email,
       perfil: selectedPerfil,
       status: 'ativo',
-      empresa: 'REIS FLOW',
+      empresa: '',
       convitesEnviados: existingAcesso?.convitesEnviados || 0,
       ultimoAcesso: existingAcesso?.ultimoAcesso || null,
-      senhaTemporaria: existingAcesso?.senhaTemporaria || ''
     }, usuariosSistemaData.length);
 
-    const userResult = await upsertUsuarioSistemaSupabase(usuarioPayload, existingAcesso?.id || '');
-    if (userResult.ok && userResult.row) {
-      const mapped = normalizeUsuarioSistema(userResult.row, 0);
-      const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(mapped.id || ''));
-      if (idx >= 0) usuariosSistemaData[idx] = mapped;
-      else usuariosSistemaData.unshift(mapped);
-      saveUsuariosSistemaToStorage();
-    } else if (userResult.fallback) {
+    if (dbResult.fallback) {
       if (existingAcesso) {
         const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(existingAcesso.id || ''));
         if (idx >= 0) usuariosSistemaData[idx] = { ...usuariosSistemaData[idx], ...usuarioPayload, id: existingAcesso.id };
@@ -2546,20 +2641,36 @@ async function salvarMembroEquipe() {
         usuariosSistemaData.unshift(usuarioPayload);
       }
       saveUsuariosSistemaToStorage();
-    } else if (userResult.error) {
-      showToast(`Acesso salvo parcialmente: ${userResult.error.message}`, 'warning');
+    } else {
+      try {
+        const mapped = await salvarAcessoUsuarioViaConvite(sourceMember, selectedPerfil, 'convite_pendente');
+        const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(mapped.id || ''));
+        if (idx >= 0) usuariosSistemaData[idx] = mapped;
+        else usuariosSistemaData.unshift(mapped);
+        saveUsuariosSistemaToStorage();
+      } catch (error) {
+        accountAccessUpdated = false;
+        console.error('Falha ao enviar ou atualizar o convite do membro.', error);
+        showToast(`Membro salvo, mas o acesso nao foi confirmado: ${error?.message || 'erro desconhecido'}`, 'error');
+      }
     }
   } else if (existingAcesso) {
-    const userResult = await upsertUsuarioSistemaSupabase({ ...existingAcesso, status: 'bloqueado' }, existingAcesso.id);
-    if (userResult.ok && userResult.row) {
-      const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(existingAcesso.id || ''));
-      if (idx >= 0) usuariosSistemaData[idx] = normalizeUsuarioSistema(userResult.row, idx);
-      saveUsuariosSistemaToStorage();
-    } else if (userResult.fallback) {
+    if (dbResult.fallback) {
       const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(existingAcesso.id || ''));
       if (idx >= 0) {
         usuariosSistemaData[idx].status = 'bloqueado';
         saveUsuariosSistemaToStorage();
+      }
+    } else {
+      try {
+        const mapped = await salvarAcessoUsuarioViaConvite(sourceMember, existingAcesso.perfil, 'bloqueado');
+        const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(mapped.id || ''));
+        if (idx >= 0) usuariosSistemaData[idx] = mapped;
+        saveUsuariosSistemaToStorage();
+      } catch (error) {
+        accountAccessUpdated = false;
+        console.error('Falha ao revogar o acesso do membro.', error);
+        showToast(`Membro atualizado, mas o acesso nao foi revogado: ${error?.message || 'erro desconhecido'}`, 'error');
       }
     }
   }
@@ -2575,7 +2686,9 @@ async function salvarMembroEquipe() {
     return;
   }
 
-  showToast(editId ? 'Membro atualizado com sucesso!' : 'Membro adicionado com sucesso!', 'success');
+  if (accountAccessUpdated) {
+    showToast(editId ? 'Membro atualizado com sucesso!' : 'Membro adicionado com sucesso!', 'success');
+  }
 }
 
 function normalizeEstoqueText(value) {
@@ -2640,7 +2753,7 @@ function normalizeEstoqueItem(item, index = 0) {
 
 function saveEstoqueToStorage() {
   try {
-    localStorage.setItem(ESTOQUE_DATA_STORAGE_KEY, JSON.stringify(estoqueData || []));
+    window.ReisFlowTenantStorage?.setItem(ESTOQUE_DATA_STORAGE_KEY, JSON.stringify(estoqueData || []));
   } catch {
     // Falha silenciosa para manter modulo funcional em memoria.
   }
@@ -2648,7 +2761,7 @@ function saveEstoqueToStorage() {
 
 function loadEstoqueFromStorage() {
   try {
-    const raw = localStorage.getItem(ESTOQUE_DATA_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(ESTOQUE_DATA_STORAGE_KEY);
     if (!raw) {
       for (let i = 0; i < estoqueData.length; i += 1) {
         estoqueData[i] = normalizeEstoqueItem(estoqueData[i], i);
@@ -2739,7 +2852,15 @@ function updateEstoqueSummary() {
 
   const total = (Array.isArray(estoqueData) ? estoqueData : []).length;
   const lowStock = (Array.isArray(estoqueData) ? estoqueData : []).filter((item) => parseEstoqueNumber(item.qtd) < parseEstoqueNumber(item.min)).length;
-  summary.textContent = `${total} item(ns) · ${lowStock} abaixo do minimo${getSyncStatusSuffix(estoqueLastSyncSource)}`;
+  summary.textContent = `${total} item(ns) · ${lowStock} abaixo do minimo${getSyncStatusSuffix(estoqueLastSyncSource, estoqueSyncError, total)}`;
+
+  const alert = document.getElementById('estoque-critical-alert');
+  const title = document.getElementById('estoque-critical-title');
+  if (alert && title) {
+    const isSynced = estoqueLastSyncSource === 'supabase';
+    alert.style.display = lowStock > 0 ? '' : 'none';
+    title.textContent = `${lowStock} item(ns) abaixo do estoque mínimo${isSynced ? '' : ' no cache local não confirmado'}`;
+  }
 }
 
 function updateEquipesSummary() {
@@ -2748,7 +2869,13 @@ function updateEquipesSummary() {
 
   const total = (Array.isArray(equipeData) ? equipeData : []).length;
   const ativos = (Array.isArray(equipeData) ? equipeData : []).filter((member) => String(member?.status || '').toLowerCase() !== 'inativo').length;
-  summary.textContent = `${total} profissionais · ${ativos} equipes ativas${getSyncStatusSuffix(equipesLastSyncSource)}`;
+  if (equipesLastSyncSource !== 'supabase' && total === 0) {
+    summary.textContent = equipesSyncError
+      ? `Dados das equipes não confirmados${getSyncStatusSuffix(equipesLastSyncSource, equipesSyncError, total)}`
+      : 'Aguardando sincronização das equipes.';
+    return;
+  }
+  summary.textContent = `${total} profissionais · ${ativos} equipes ativas${getSyncStatusSuffix(equipesLastSyncSource, equipesSyncError, total)}`;
 }
 
 function populateEstoqueMaterialOptions() {
@@ -2889,6 +3016,7 @@ async function upsertEstoqueItemInSupabase(item) {
 
     if (error) throw error;
     estoqueLastSyncSource = 'supabase';
+    estoqueSyncError = '';
     return { ok: true, row: data };
   } catch (error) {
     if (isFornecedorSupabaseFallbackError(error)) {
@@ -3051,12 +3179,20 @@ function mapEstoqueSupabaseRowToUi(itemRow, movAgg) {
 
 async function syncEstoqueFromSupabaseByEvents(options = {}) {
   const { silent = true } = options;
-  if (!window.db?.from) return false;
-
-  const hasSession = await hasSupabaseSession();
-  if (!hasSession) return false;
+  if (!window.db?.from) {
+    estoqueLastSyncSource = 'local';
+    estoqueSyncError = 'Supabase indisponivel';
+    return false;
+  }
 
   try {
+    const hasSession = await hasSupabaseSession();
+    if (!hasSession) {
+      estoqueLastSyncSource = 'local';
+      estoqueSyncError = 'sessao Supabase indisponivel';
+      return false;
+    }
+
     const [itemsRes, movsRes] = await Promise.all([
       db.from('estoque_itens').select('id, codigo, nome, categoria, quantidade, minimo, custo_unitario, fornecedor, fornecedor_id').order('codigo', { ascending: true }),
       db.from('estoque_movimentos').select('estoque_item_id, tipo, quantidade, custo_unitario, created_at').order('created_at', { ascending: true })
@@ -3073,6 +3209,7 @@ async function syncEstoqueFromSupabaseByEvents(options = {}) {
     });
 
     estoqueLastSyncSource = 'supabase';
+    estoqueSyncError = '';
 
     saveEstoqueToStorage();
     populateEstoqueMaterialOptions();
@@ -3081,6 +3218,7 @@ async function syncEstoqueFromSupabaseByEvents(options = {}) {
     return true;
   } catch (error) {
     estoqueLastSyncSource = 'local';
+    estoqueSyncError = String(error?.message || error || 'erro desconhecido');
     if (!silent) {
       showToast(`Falha ao sincronizar estoque por eventos: ${error?.message || 'erro desconhecido'}`, 'warning');
     }
@@ -3560,23 +3698,17 @@ function formatCurrencyCompactBR(value) {
 }
 
 function isFinanceQuitadoStatus(status) {
-  const s = normalizeDashboardStatus(status);
-  return s === 'recebido' || s === 'pago';
+  return ReisFlowMetrics.getPaymentState({ status }) === 'quitado';
 }
 
 function getWorkMetrics(obrasList = []) {
   const list = Array.isArray(obrasList) ? obrasList : [];
-  const obrasAtivas = list.filter((obra) => {
-    const st = normalizeDashboardStatus(obra?.status);
-    return st === 'andamento' || st === 'aprovada';
-  }).length;
-
-  const obrasAtrasadas = list.filter((obra) => normalizeDashboardStatus(obra?.status) === 'atrasada').length;
+  const aggregate = ReisFlowMetrics.aggregateWorkMetrics(list);
 
   return {
-    obrasAtivas,
-    obrasAtrasadas,
-    totalObras: list.length,
+    obrasAtivas: aggregate.active,
+    obrasAtrasadas: aggregate.delayed,
+    totalObras: aggregate.total,
     updatedAt: new Date().toISOString(),
     sourceCount: list.length
   };
@@ -3584,12 +3716,15 @@ function getWorkMetrics(obrasList = []) {
 
 function getBudgetMetrics(orcList = []) {
   const list = Array.isArray(orcList) ? orcList : [];
-  const pendentesList = list.filter((orc) => normalizeDashboardStatus(orc?.status) === 'pendente');
-  const clientePendentesList = list.filter((orc) => normalizeDashboardStatus(orc?.status) === 'cliente_pendente');
+  const aggregate = ReisFlowMetrics.aggregateBudgetMetrics(
+    list.map((orc) => ({ ...orc, value: orc.valor, validity: orc.validade })),
+    ReisFlowMetrics.todayInTimeZone()
+  );
+  const clientePendentesList = aggregate.effective.filter((orc) => orc.effectiveStatus === 'cliente_pendente');
 
   return {
-    orcPendentes: pendentesList.length,
-    orcPendentesValor: pendentesList.reduce((sum, orc) => sum + parseCurrencyValue(orc?.valor), 0),
+    orcPendentes: aggregate.count,
+    orcPendentesValor: aggregate.total,
     orcClientePendentes: clientePendentesList.length,
     updatedAt: new Date().toISOString(),
     sourceCount: list.length
@@ -3621,56 +3756,12 @@ function getStockMetrics(estoqueList = []) {
 function getFinanceMetrics(recList = [], pagList = []) {
   const receber = Array.isArray(recList) ? recList : [];
   const pagar = Array.isArray(pagList) ? pagList : [];
-
-  const recOpen = receber.filter((item) => !isFinanceQuitadoStatus(item?.status));
-  const pagOpen = pagar.filter((item) => !isFinanceQuitadoStatus(item?.status));
-  const recPaid = receber.filter((item) => normalizeDashboardStatus(item?.status) === 'recebido');
-  const pagPaid = pagar.filter((item) => normalizeDashboardStatus(item?.status) === 'pago');
-
-  const totalReceber = recOpen.reduce((sum, item) => sum + getFinanceAmount(item), 0);
-  const totalPagar = pagOpen.reduce((sum, item) => sum + getFinanceAmount(item), 0);
-  const totalPagarCompromissado = pagar.reduce((sum, item) => sum + getFinanceAmount(item), 0);
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const ate7Dias = new Date(hoje.getTime() + (7 * 86400000));
-
-  const pagar7dias = pagOpen.reduce((sum, item) => {
-    const d = parseFinanceDate(item?.venc || item?.vencimento);
-    if (!d) return sum;
-    return d <= ate7Dias ? sum + getFinanceAmount(item) : sum;
-  }, 0);
-
-  const faturadoMes = recPaid
-    .filter((item) => isSameMonthYear(getFinanceEventDate(item), hoje))
-    .reduce((sum, item) => sum + getFinanceAmount(item), 0);
-
-  const pagoMes = pagPaid
-    .filter((item) => isSameMonthYear(getFinanceEventDate(item), hoje))
-    .reduce((sum, item) => sum + getFinanceAmount(item), 0);
-
-  const saldo = totalReceber - totalPagarCompromissado - pagoMes;
-
-  const contasAbertas = [...recOpen, ...pagOpen];
-  const contasVencendo = contasAbertas
-    .filter((item) => {
-      const d = parseFinanceDate(item?.venc || item?.vencimento);
-      if (!d) return false;
-      d.setHours(0, 0, 0, 0);
-      return d >= hoje && d <= ate7Dias;
-    })
-    .reduce((sum, item) => sum + getFinanceAmount(item), 0);
+  const today = ReisFlowMetrics.todayInTimeZone();
+  const aggregate = ReisFlowMetrics.aggregateFinanceMetrics(receber, pagar, today, today.slice(0, 7));
 
   return {
-    totalReceber,
-    totalPagar,
-    saldo,
-    faturadoMes,
-    pagar7dias,
-    contasVencendo,
-    aReceber: totalReceber,
-    aReceberCount: recOpen.length,
-    totalPagarCompromissado,
+    ...aggregate,
+    aReceber: aggregate.totalReceber,
     updatedAt: new Date().toISOString(),
     sourceCount: receber.length + pagar.length
   };
@@ -3690,15 +3781,12 @@ function getDashboardMetrics() {
   const stock = getStockMetrics(estoqueList);
   const finance = getFinanceMetrics(recList, pagList);
 
-  const lucroPrevisto = Math.max(0, finance.aReceber - finance.totalPagar);
-  const margem = finance.aReceber > 0 ? (lucroPrevisto / finance.aReceber) * 100 : 0;
-
   return {
     obrasAtivas: work.obrasAtivas,
     obrasAtrasadas: work.obrasAtrasadas,
     faturamentoMensal: finance.faturadoMes,
-    lucroPrevisto,
-    margem,
+    lucroPrevisto: null,
+    margem: null,
     orcPendentes: budget.orcPendentes,
     orcPendentesValor: budget.orcPendentesValor,
     orcClientePendentes: budget.orcClientePendentes,
@@ -3726,6 +3814,10 @@ function updateDashboardDeadlineAlert() {
   const titleEl = document.getElementById('dash-obras-alert-title');
   const descEl = document.getElementById('dash-obras-alert-desc');
   if (!alertEl || !titleEl || !descEl) return;
+  if (window._reisPrimaryDataState !== 'synced') {
+    alertEl.style.display = 'none';
+    return;
+  }
 
   const delayed = Array.isArray(obras)
     ? obras.filter((obra) => normalizeDashboardStatus(obra?.status) === 'atrasada')
@@ -3750,16 +3842,24 @@ function updateDashboardDeadlineAlert() {
 
 function applyDashboardMetrics() {
   const m = getDashboardMetrics();
+  const primaryState = window._reisPrimaryDataState || 'loading';
+  const dataAvailable = primaryState === 'synced';
 
-  setDashboardMetricText('dash-obras-ativas-value', String(m.obrasAtivas), 'dash-obras-ativas-sub', `${m.totalObras} obras cadastradas`);
-  setDashboardMetricText('dash-obras-atrasadas-value', String(m.obrasAtrasadas), 'dash-obras-atrasadas-sub', `${m.totalObras > 0 ? Math.round((m.obrasAtrasadas / m.totalObras) * 100) : 0}% da carteira`);
-  setDashboardMetricText('dash-faturamento-mensal-value', formatCurrencyCompactBR(m.faturamentoMensal), 'dash-faturamento-mensal-sub', 'Recebido no periodo atual');
-  setDashboardMetricText('dash-lucro-previsto-value', formatCurrencyCompactBR(m.lucroPrevisto), 'dash-lucro-previsto-sub', `${m.margem.toFixed(1)}% margem prevista`);
-  setDashboardMetricText('dash-orc-pendentes-value', String(m.orcPendentes), 'dash-orc-pendentes-sub', `${formatCurrencyCompactBR(m.orcPendentesValor)} em aberto`);
-  setDashboardMetricText('dash-equipes-campo-value', String(m.equipesCampo), 'dash-equipes-campo-sub', `${m.equipesAtivas} tecnicos ativos`);
-  setDashboardMetricText('dash-contas-vencendo-value', formatCurrencyCompactBR(m.contasVencendo), 'dash-contas-vencendo-sub', 'Proximos 7 dias');
-  setDashboardMetricText('dash-a-receber-value', formatCurrencyCompactBR(m.aReceber), 'dash-a-receber-sub', `${m.aReceberCount} parcela(s) em aberto`);
-  setDashboardMetricText('dash-estoque-critico-value', String(m.estoqueCritico), 'dash-estoque-critico-sub', `${m.estoqueCritico} item(ns) abaixo do minimo`);
+  const primaryUnavailable = primaryState !== 'synced';
+  const sourceWarning = (source, error, count) => source === 'supabase'
+    ? ''
+    : ` · ${error ? 'falha de sincronização' : count ? 'cache local não confirmado' : 'sincronização pendente'}`;
+  const teamAvailable = equipesLastSyncSource === 'supabase' || equipeData.length > 0;
+  const stockAvailable = estoqueLastSyncSource === 'supabase' || estoqueData.length > 0;
+  setDashboardMetricText('dash-obras-ativas-value', primaryUnavailable ? '—' : String(m.obrasAtivas), 'dash-obras-ativas-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.totalObras} obras cadastradas`);
+  setDashboardMetricText('dash-obras-atrasadas-value', primaryUnavailable ? '—' : String(m.obrasAtrasadas), 'dash-obras-atrasadas-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.totalObras > 0 ? Math.round((m.obrasAtrasadas / m.totalObras) * 100) : 0}% da carteira`);
+  setDashboardMetricText('dash-faturamento-mensal-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.faturamentoMensal), 'dash-faturamento-mensal-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : 'Recebimentos com baixa neste mês');
+  setDashboardMetricText('dash-lucro-previsto-value', '—', 'dash-lucro-previsto-sub', 'Custo previsto de obras não está disponível');
+  setDashboardMetricText('dash-orc-pendentes-value', primaryUnavailable ? '—' : String(m.orcPendentes), 'dash-orc-pendentes-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${formatCurrencyCompactBR(m.orcPendentesValor)} em orçamentos pendentes`);
+  setDashboardMetricText('dash-equipes-campo-value', teamAvailable ? String(m.equipesCampo) : '—', 'dash-equipes-campo-sub', `${teamAvailable ? `${m.equipesAtivas} profissionais ativos` : 'Dados não confirmados'}${sourceWarning(equipesLastSyncSource, equipesSyncError, equipeData.length)}`);
+  setDashboardMetricText('dash-contas-vencendo-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.contasVencendo), 'dash-contas-vencendo-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : 'A receber + a pagar · hoje a hoje + 7 dias');
+  setDashboardMetricText('dash-a-receber-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.aReceber), 'dash-a-receber-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.aReceberCount} lançamento(s) em aberto`);
+  setDashboardMetricText('dash-estoque-critico-value', stockAvailable ? String(m.estoqueCritico) : '—', 'dash-estoque-critico-sub', `${stockAvailable ? `${m.estoqueCritico} item(ns) abaixo do mínimo` : 'Dados não confirmados'}${sourceWarning(estoqueLastSyncSource, estoqueSyncError, estoqueData.length)}`);
 
   const metaEl = document.getElementById('dash-metrics-meta');
   if (metaEl) {
@@ -3772,6 +3872,9 @@ function applyDashboardMetrics() {
   }
 
   updateDashboardDeadlineAlert();
+  updateDashboardWorkDistribution();
+  updateDashboardLists();
+  buildDashChart();
 }
 
 function updateDashboardOperationalStats() {
@@ -3786,41 +3889,165 @@ function openPendingClientBudgets() {
 }
 
 function buildDashChart() {
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-  const values = [182, 210, 198, 245, 243, 287];
-  const maxValue = Math.max(...values);
   const chart = document.getElementById('chart-fat');
   const labels = document.getElementById('chart-labels');
+  const title = document.getElementById('chart-period-label');
+  const selector = document.getElementById('dash-period');
+  if (!chart || !labels) return;
 
-  if (!chart || chart.children.length > 0) return;
+  if (!selector?.value) initializeDashboardPeriodSelector();
+  const today = ReisFlowMetrics.todayInTimeZone();
+  const selectedMonth = selector?.value || today.slice(0, 7);
+  const months = ReisFlowMetrics.getRollingMonths(selectedMonth, 6);
+  if (title && months.length) {
+    const first = months[0];
+    const last = months[months.length - 1];
+    title.textContent = `${formatMonthLabel(first)} – ${formatMonthLabel(last)}`;
+  }
 
-  values.forEach((value, index) => {
-    const pct = Math.round((value / maxValue) * 100);
-    const isLast = index === values.length - 1;
-    chart.innerHTML += `<div style="flex:1;border-radius:3px 3px 0 0;height:${pct}%;background:${isLast ? 'var(--petrol-light)' : 'rgba(33,118,163,0.35)'};cursor:pointer;transition:opacity 0.15s;position:relative" title="${months[index]}: R$ ${value}k" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1"></div>`;
-    labels.innerHTML += `<span>${months[index]}</span>`;
+  chart.innerHTML = '';
+  labels.innerHTML = '';
+  if (window._reisPrimaryDataState !== 'synced') {
+    chart.innerHTML = '<div class="muted" style="align-self:center;width:100%;text-align:center">Dados do banco indisponíveis</div>';
+    return;
+  }
+
+  const totals = months.map((month) => {
+    const total = (Array.isArray(financRec) ? financRec : [])
+      .filter((item) => isFinanceQuitadoStatus(item.status) && ReisFlowMetrics.getPaidDateKey(item).slice(0, 7) === month.key)
+      .reduce((sum, item) => sum + getFinanceAmount(item), 0);
+    return { ...month, total };
   });
+  const maxValue = Math.max(1, ...totals.map((month) => month.total));
+  totals.forEach((month, index) => {
+    const pct = month.total === 0 ? 0 : Math.max(3, Math.round((month.total / maxValue) * 100));
+    const isLast = index === totals.length - 1;
+    const date = new Date(Date.UTC(month.year, month.month, 1));
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' }).format(date).replace('.', '');
+    chart.innerHTML += `<div style="flex:1;border-radius:3px 3px 0 0;height:${pct}%;background:${isLast ? 'var(--petrol-light)' : 'rgba(33,118,163,0.35)'};transition:opacity 0.15s;position:relative" title="${label}: ${formatCurrencyValue(month.total)}"></div>`;
+    labels.innerHTML += `<span>${label}</span>`;
+  });
+}
+
+function formatMonthLabel(month) {
+  const date = new Date(Date.UTC(month.year, month.month, 1));
+  return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(date)
+    .replace('.', '');
+}
+
+function initializeDashboardPeriodSelector() {
+  const selector = document.getElementById('dash-period');
+  if (!selector) return;
+  const currentMonth = ReisFlowMetrics.todayInTimeZone().slice(0, 7);
+  const months = ReisFlowMetrics.getRollingMonths(currentMonth, 12).reverse();
+  selector.innerHTML = months.map((month) => {
+    const date = new Date(Date.UTC(month.year, month.month, 1));
+    const label = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
+    return `<option value="${month.key}">${label}</option>`;
+  }).join('');
+  selector.value = currentMonth;
+}
+
+function onDashboardPeriodChange() {
+  buildDashChart();
+}
+
+function updateDashboardWorkDistribution() {
+  const container = document.getElementById('dash-obras-status');
+  if (!container) return;
+  if (window._reisPrimaryDataState !== 'synced') {
+    container.innerHTML = '<div class="muted">Dados do banco indisponíveis.</div>';
+    return;
+  }
+
+  const groups = [
+    { key: 'andamento', label: 'Em andamento', color: 'var(--petrol-light)' },
+    { key: 'aprovada', label: 'Aprovadas', color: '#A76EF6' },
+    { key: 'orcamento', label: 'Orçamento', color: 'var(--orange)' },
+    { key: 'pausada', label: 'Pausadas', color: 'var(--gray)' },
+    { key: 'concluida', label: 'Concluídas', color: 'var(--green)' },
+    { key: 'atrasada', label: 'Atrasadas', color: 'var(--red)' }
+  ];
+  const total = obras.length;
+  container.innerHTML = groups.map((group) => {
+    const count = obras.filter((work) => ReisFlowMetrics.normalizeStatus(work.status) === group.key).length;
+    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+    return `<div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>${group.label} (${count})</span><span style="color:${group.color}">${percentage}%</span></div>
+      <div class="progress"><div class="progress-fill" style="width:${percentage}%;background:${group.color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function updateDashboardLists() {
+  const worksContainer = document.getElementById('dash-recent-works');
+  const clientsBody = document.getElementById('dash-recent-clients');
+  const state = window._reisPrimaryDataState;
+  if (worksContainer) {
+    worksContainer.innerHTML = '';
+    if (state !== 'synced') {
+      worksContainer.textContent = state === 'error' ? 'Dados indisponíveis; a lista anterior pode estar desatualizada.' : 'Aguardando sincronização.';
+    } else if (obras.length === 0) {
+      worksContainer.textContent = 'Nenhuma obra cadastrada.';
+    } else {
+      obras.slice(0, 3).forEach((work) => {
+        const card = document.createElement('div');
+        card.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer';
+        card.addEventListener('click', () => openObraDetail(work.code));
+        const details = document.createElement('div');
+        details.style.cssText = 'flex:1;min-width:0';
+        const name = document.createElement('div');
+        name.className = 'bold';
+        name.textContent = work.name || 'Obra sem nome';
+        const meta = document.createElement('div');
+        meta.className = 'muted';
+        meta.style.fontSize = '11px';
+        meta.textContent = `${work.code || 'Sem código'} · Prazo: ${work.prazo || 'não informado'}`;
+        const status = document.createElement('span');
+        status.innerHTML = statusBadge(work.status);
+        details.append(name, meta);
+        card.append(details, status);
+        worksContainer.append(card);
+      });
+    }
+  }
+
+  if (clientsBody) {
+    clientsBody.innerHTML = '';
+    if (state !== 'synced') {
+      const row = clientsBody.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 5;
+      cell.className = 'muted';
+      cell.textContent = state === 'error' ? 'Dados indisponíveis; a lista anterior pode estar desatualizada.' : 'Aguardando sincronização.';
+    } else if (clientes.length === 0) {
+      const row = clientsBody.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 5;
+      cell.className = 'muted';
+      cell.textContent = 'Nenhum cliente cadastrado.';
+    } else {
+      clientes.slice(0, 3).forEach((client) => {
+        const metrics = getClienteDashboardMetrics(client);
+        const row = clientsBody.insertRow();
+        row.addEventListener('click', () => navigate('clientes', null));
+        [client.name, client.tipo || '—', String(metrics.totalObras), formatCurrencyValue(metrics.valorContratado), client.status || '—']
+          .forEach((value) => {
+            const cell = row.insertCell();
+            cell.textContent = value;
+          });
+      });
+    }
+  }
 }
 
 function parseFinanceDate(value) {
   if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    const date = new Date(raw + (raw.length === 10 ? 'T00:00:00' : ''));
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const parts = raw.split('/');
-  if (parts.length === 3) {
-    const date = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  const date = new Date(raw);
+  const key = ReisFlowMetrics.toDateKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -3833,31 +4060,34 @@ function getFinanceStatus(item) {
 }
 
 function getFlowPeriodConfig(period) {
-  const today = new Date();
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  let start = new Date(end);
-  let label = 'Últimos 30 dias';
-  let type = 'days';
-  let points = 30;
-
-  if (period === '7d') {
-    start.setDate(end.getDate() - 6);
-    label = 'Últimos 7 dias';
-    points = 7;
-  } else if (period === '15d') {
-    start.setDate(end.getDate() - 14);
-    label = 'Últimos 15 dias';
-    points = 15;
-  } else if (period === 'anual') {
-    start = new Date(end.getFullYear(), 0, 1);
-    label = `Ano de ${end.getFullYear()}`;
-    type = 'months';
-    points = 12;
-  } else {
-    start.setDate(end.getDate() - 29);
+  const today = ReisFlowMetrics.todayInTimeZone();
+  const [year, month, day] = today.split('-').map(Number);
+  const start = new Date(year, month - 1, day);
+  if (period === 'anual') {
+    const end = new Date(year, month + 10, day);
+    return {
+      start,
+      end,
+      startKey: today,
+      endKey: ReisFlowMetrics.toDateKey(end),
+      label: 'Próximos 12 meses',
+      type: 'months',
+      points: 12
+    };
   }
 
-  return { start, end, label, type, points };
+  const days = period === '7d' ? 7 : period === '15d' ? 15 : 30;
+  const endKey = ReisFlowMetrics.addDays(today, days - 1);
+  const [endYear, endMonth, endDay] = endKey.split('-').map(Number);
+  return {
+    start,
+    end: new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999),
+    startKey: today,
+    endKey,
+    label: `Próximos ${days} dias`,
+    type: 'days',
+    points: days
+  };
 }
 
 function buildFlowSeries(period) {
@@ -3865,15 +4095,17 @@ function buildFlowSeries(period) {
   const series = [];
 
   if (cfg.type === 'months') {
-    for (let month = 0; month < 12; month += 1) {
-      const start = new Date(cfg.end.getFullYear(), month, 1);
-      const end = new Date(cfg.end.getFullYear(), month + 1, 0, 23, 59, 59, 999);
+    const [startYear, startMonth] = cfg.startKey.split('-').map(Number);
+    for (let offset = 0; offset < 12; offset += 1) {
+      const start = new Date(startYear, startMonth - 1 + offset, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
       series.push({ label: new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(start).replace('.', ''), start, end, entradas: 0, saidas: 0, saldo: 0 });
     }
   } else {
-    for (let offset = cfg.points - 1; offset >= 0; offset -= 1) {
-      const start = new Date(cfg.end);
-      start.setDate(cfg.end.getDate() - offset);
+    for (let offset = 0; offset < cfg.points; offset += 1) {
+      const dateKey = ReisFlowMetrics.addDays(cfg.startKey, offset);
+      const [year, month, day] = dateKey.split('-').map(Number);
+      const start = new Date(year, month - 1, day);
       const end = new Date(start);
       end.setHours(23, 59, 59, 999);
       series.push({ label: start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), start, end, entradas: 0, saidas: 0, saldo: 0 });
@@ -3885,9 +4117,11 @@ function buildFlowSeries(period) {
 
   const fillSeries = (items, isEntrada) => {
     items.forEach((item) => {
+      if (ReisFlowMetrics.getPaymentState(item) === 'quitado') return;
       const refDate = parseFinanceDate(item.venc || item.vencimento);
       if (!refDate) return;
-      if (refDate < cfg.start || refDate > cfg.end) return;
+      const dateKey = ReisFlowMetrics.toDateKey(refDate);
+      if (dateKey < cfg.startKey || dateKey > cfg.endKey) return;
 
       const amount = getFinanceAmount(item);
       const bucket = series.find((point) => refDate >= point.start && refDate <= point.end);
@@ -4265,13 +4499,15 @@ async function alternarStatusLancamentoFinanceiro() {
   const table = tipo === 'receber' ? 'financeiro_receber' : 'financeiro_pagar';
 
   try {
-    const { error } = await db.from(table).update({ status: targetStatus }).eq('referencia', editRef);
+    const isSettled = targetStatus === 'recebido' || targetStatus === 'pago';
+    const paidAt = isSettled ? new Date().toISOString() : null;
+    const { error } = await db.from(table).update({ status: targetStatus, paid_at: paidAt }).eq('referencia', editRef);
     if (error) throw error;
 
     const list = tipo === 'receber' ? financRec : financPag;
     const idx = list.findIndex((item) => String(item.ref || '') === editRef);
     if (idx >= 0) {
-      list[idx] = { ...list[idx], status: targetStatus };
+      list[idx] = { ...list[idx], status: targetStatus, paidAt };
     }
 
     if (typeof populateFin === 'function') populateFin();
@@ -4700,7 +4936,7 @@ function parseBudgetLineMoney(value) {
 function calcLine(input) {
   const line = input.closest('.budget-line');
   const fields = line.querySelectorAll('input');
-  const quantity = parseFloat(fields[1].value) || 0;
+  const quantity = parseFloat(fields[1].value) || 1;
   if (typeof formatarMoedaInput === 'function') {
     formatarMoedaInput(fields[2]);
   }
@@ -4710,25 +4946,63 @@ function calcLine(input) {
 }
 
 function calcTotals() {
-  let subtotal = 0;
-
+  const items = [];
   document.querySelectorAll('#orc-modal-lines .budget-line').forEach((line) => {
     const inputs = line.querySelectorAll('input');
-    const quantity = parseFloat(inputs[1].value) || 0;
+    const description = String(inputs[0].value || '').trim();
+    if (!description) return;
+    const quantity = parseFloat(inputs[1].value) || 1;
     const unit = parseBudgetLineMoney(inputs[2].value);
-    subtotal += quantity * unit;
+    items.push({ quantity, unitPrice: unit });
   });
 
-  const margin = (parseFloat(document.getElementById('modal-margem').value) || 0) / 100;
-  const discount = parseFloat(document.getElementById('modal-desconto').value) || 0;
-  const displacement = parseFloat(document.getElementById('modal-desloc').value) || 0;
-  const profit = subtotal * margin;
-  const total = subtotal + profit + displacement - discount;
+  const marginInput = document.getElementById('modal-margem');
+  const discountInput = document.getElementById('modal-desconto');
+  const displacementInput = document.getElementById('modal-desloc');
+  const errorEl = document.getElementById('orc-calculation-error');
+  const saveButton = document.getElementById('btn-salvar-orc');
+  const legacyValuesMissing = [discountInput, displacementInput].some((input) => input?.dataset.legacyValueUnknown === 'true' && !String(input.value || '').trim());
+  let calculation = null;
+
+  try {
+    calculation = ReisFlowMetrics.calculateBudget({
+      items,
+      marginPercent: String(marginInput?.value || '').trim() === '' ? NaN : Number(marginInput.value),
+      discount: Number(discountInput?.value || 0),
+      displacement: Number(displacementInput?.value || 0)
+    });
+    if (errorEl) {
+      errorEl.style.display = legacyValuesMissing ? '' : 'none';
+      errorEl.textContent = legacyValuesMissing
+        ? 'Este orçamento antigo não registra desconto/deslocamento. Informe os dois valores antes de salvar para preservar o total.'
+        : '';
+    }
+  } catch (error) {
+    if (errorEl) {
+      errorEl.style.display = '';
+      errorEl.textContent = error.message;
+    }
+  }
+
+  if (saveButton) saveButton.disabled = !calculation || legacyValuesMissing;
   const formatCurrency = (value) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  document.getElementById('modal-subtotal').textContent = formatCurrency(subtotal);
-  document.getElementById('modal-lucro').textContent = formatCurrency(profit);
-  document.getElementById('modal-total').textContent = formatCurrency(total);
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  };
+  if (!calculation) {
+    ['modal-costs', 'modal-subtotal', 'modal-displacement', 'modal-discount', 'modal-lucro', 'modal-total']
+      .forEach((id) => setText(id, '—'));
+    return null;
+  }
+  setText('modal-costs', formatCurrency(calculation.itemCost));
+  setText('modal-subtotal', formatCurrency(calculation.saleSubtotal));
+  setText('modal-displacement', formatCurrency(calculation.displacement));
+  setText('modal-discount', `-${formatCurrency(calculation.discount)}`);
+  setText('modal-lucro', `${formatCurrency(calculation.profit)} · ${calculation.marginPercent.toFixed(2)}%`);
+  setText('modal-total', formatCurrency(calculation.total));
+  return calculation;
 }
 
 function switchLoginTab(tab, button) {
@@ -4759,6 +5033,12 @@ function switchLoginTab(tab, button) {
 }
 
 function goToApp(nome, cargo = 'operador') {
+  if (!window._reisActiveAuthScope) {
+    goToLogin();
+    showToast('Sessao sem escopo de organizacao. O acesso foi bloqueado.', 'error');
+    return;
+  }
+
   if (typeof setCurrentUserContext === 'function') {
     setCurrentUserContext(nome, cargo);
   }
@@ -4780,10 +5060,10 @@ function goToApp(nome, cargo = 'operador') {
         populateFornecedores();
       }
     })
-    .catch(() => {
-      equipesLastSyncSource = 'local';
-      estoqueLastSyncSource = 'local';
-      fornecedoresLastSyncSource = 'local';
+    .catch((error) => {
+      console.error('Falha ao concluir a sincronização dos dados auxiliares do Dashboard.', error);
+      showToast('Falha ao sincronizar dados auxiliares. Verifique o estado de cada módulo.', 'warning');
+      updateDashboardOperationalStats();
     });
   setTimeout(() => {
     const saudacao = nome ? `Bem-vindo, ${nome.split(' ')[0]}!` : 'Bem-vindo ao REIS FLOW!';

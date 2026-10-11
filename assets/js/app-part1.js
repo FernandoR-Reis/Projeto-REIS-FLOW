@@ -37,6 +37,11 @@ const ROLE_ACCESS = {
     label: 'Operador',
     views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
     modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-lancamento', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-equipe-detalhe']
+  },
+  visualizador: {
+    label: 'Visualizador',
+    views: ['dashboard'],
+    modals: []
   }
 };
 
@@ -209,26 +214,9 @@ const DEFAULT_OBRA_ETAPAS = [
   { id: 'etapa-7', titulo: 'Vistoria final e entrega', done: false }
 ];
 
-const DEFAULT_OBRA_HISTORY = [
-  {
-    id: 'seed-h-1',
-    type: 'foto_upload',
-    title: 'Fotos enviadas — fase elétrica',
-    desc: 'Registro inicial de acompanhamento da obra.',
-    dateIso: new Date().toISOString()
-  },
-  {
-    id: 'seed-h-2',
-    type: 'etapa_concluida',
-    title: 'Etapa demolição concluída',
-    desc: 'Atualização inicial do cronograma.',
-    dateIso: new Date(Date.now() - 86400000).toISOString()
-  }
-];
-
 function readObraEtapasStore() {
   try {
-    const raw = localStorage.getItem(OBRA_ETAPAS_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(OBRA_ETAPAS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -237,12 +225,12 @@ function readObraEtapasStore() {
 }
 
 function saveObraEtapasStore(store) {
-  localStorage.setItem(OBRA_ETAPAS_STORAGE_KEY, JSON.stringify(store || {}));
+  window.ReisFlowTenantStorage?.setItem(OBRA_ETAPAS_STORAGE_KEY, JSON.stringify(store || {}));
 }
 
 function readObraHistoryStore() {
   try {
-    const raw = localStorage.getItem(OBRA_HISTORY_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(OBRA_HISTORY_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -251,7 +239,7 @@ function readObraHistoryStore() {
 }
 
 function saveObraHistoryStore(store) {
-  localStorage.setItem(OBRA_HISTORY_STORAGE_KEY, JSON.stringify(store || {}));
+  window.ReisFlowTenantStorage?.setItem(OBRA_HISTORY_STORAGE_KEY, JSON.stringify(store || {}));
 }
 
 async function getCurrentAuthUserId() {
@@ -458,14 +446,7 @@ function getObraHistory(code) {
   const store = readObraHistoryStore();
   const fromStore = normalizeHistoryList(store[key]);
   if (fromStore.length > 0) return fromStore;
-
-  const seeded = DEFAULT_OBRA_HISTORY.map((item) => ({
-    ...item,
-    id: `${item.id}-${key}`
-  }));
-  store[key] = seeded;
-  saveObraHistoryStore(store);
-  return seeded;
+  return [];
 }
 
 function setObraHistory(code, historyEvents) {
@@ -1260,9 +1241,51 @@ function populateObraDetail(code) {
   document.getElementById('obra-detail-prazo').textContent = obra.prazo;
   document.getElementById('obra-detail-valor').textContent = obra.valor;
   document.getElementById('obra-detail-status').innerHTML = statusBadge(obra.status);
+  const custo = obra.custoPrevisto != null && Number.isFinite(Number(obra.custoPrevisto)) ? Number(obra.custoPrevisto) : null;
+  const valorVenda = Number(obra.valorNumerico ?? parseCurrencyBRL(obra.valor));
+  const lucro = custo === null ? null : valorVenda - custo;
+  const margem = lucro === null || valorVenda <= 0 ? null : (lucro / valorVenda) * 100;
+  document.getElementById('obra-detail-custo').textContent = custo === null ? 'Não informado' : formatCurrencyBRL(custo);
+  document.getElementById('obra-detail-lucro').textContent = lucro === null ? 'Não calculável sem custo' : formatCurrencyBRL(lucro);
+  document.getElementById('obra-detail-margem').textContent = margem === null ? 'Não calculável sem custo' : `${margem.toFixed(2)}%`;
+  renderObraFinancialDetails(obra);
   renderObraEtapasChecklist(code);
   renderObraHistoryTimeline(code);
   updateObraProgressUI(obra);
+}
+
+function renderObraFinancialDetails(obra) {
+  const tbody = document.getElementById('obra-finance-tbody');
+  const meta = document.getElementById('obra-finance-meta');
+  if (!tbody || !meta) return;
+
+  const items = (Array.isArray(financRec) ? financRec : []).filter((item) => {
+    if (obra.id && item.obraId) return String(item.obraId) === String(obra.id);
+    return String(item.obra || '').trim() === String(obra.code || '').trim();
+  });
+  tbody.innerHTML = '';
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted" style="text-align:center">Nenhum recebível vinculado a esta obra.</td></tr>';
+    meta.textContent = 'Não há parcelas registradas na fonte financeira para esta obra.';
+    return;
+  }
+
+  const totalParcelas = items.reduce((sum, item) => sum + parseCurrencyBRL(item.valor), 0);
+  const totalVenda = Number(obra.valorNumerico ?? parseCurrencyBRL(obra.valor));
+  const diferenca = totalParcelas - totalVenda;
+  meta.textContent = Math.abs(diferenca) < 0.01
+    ? `Recebíveis registrados: ${formatCurrencyBRL(totalParcelas)} · conciliados com o valor vendido.`
+    : `Recebíveis registrados: ${formatCurrencyBRL(totalParcelas)} · diferença para o valor vendido: ${formatCurrencyBRL(diferenca)}.`;
+
+  items.forEach((item, index) => {
+    tbody.innerHTML += `<tr>
+      <td class="mono">#${index + 1}</td>
+      <td>${item.desc || 'Recebível'}</td>
+      <td class="bold">${formatCurrencyBRL(parseCurrencyBRL(item.valor))}</td>
+      <td class="muted">${item.venc || item.vencimento || '—'}</td>
+      <td>${typeof renderFinanceStatus === 'function' ? renderFinanceStatus(item) : statusBadge(item.status)}</td>
+    </tr>`;
+  });
 }
 
 function openObraDetail(code) {
@@ -1365,7 +1388,19 @@ function clearObrasFilters() {
 function populateObras() {
   const obrasFiltradas = getFilteredObras();
   const tbody = document.getElementById('obras-tbody');
-  if (tbody && tbody.children.length === 0) {
+  const summary = document.getElementById('obras-summary');
+  const metrics = typeof getWorkMetrics === 'function' ? getWorkMetrics(obras) : { obrasAtivas: 0, obrasAtrasadas: 0 };
+  const syncSuffix = window._reisPrimaryDataState === 'synced'
+    ? ''
+    : window._reisPrimaryDataState === 'error'
+      ? ' · banco indisponível; valores podem estar desatualizados'
+      : ' · aguardando sincronização';
+  if (summary) summary.textContent = `${metrics.obrasAtivas} obras ativas · ${metrics.obrasAtrasadas} atrasadas${syncSuffix}`;
+  if (tbody) {
+    tbody.innerHTML = '';
+    if (obrasFiltradas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:center">Nenhuma obra encontrada com os filtros atuais.</td></tr>';
+    }
     const canEditObra = canAccessView('obras');
     obrasFiltradas.forEach((obra) => {
       const editButton = canEditObra
@@ -1385,7 +1420,8 @@ function populateObras() {
   }
 
   const kanban = document.getElementById('obras-kanban');
-  if (!kanban || kanban.children.length > 0) return;
+  if (!kanban) return;
+  kanban.innerHTML = '';
 
   const columns = [
     {key:'orcamento',label:'Orçamento',color:'var(--orange)'},
@@ -1421,7 +1457,17 @@ function populateObras() {
 
 function populateOrc() {
   const tbody = document.getElementById('orc-tbody');
-  if (!tbody || tbody.children.length > 0) return;
+  if (!tbody) return;
+
+  const metrics = typeof getBudgetMetrics === 'function' ? getBudgetMetrics(orcamentos) : { orcPendentes: 0, orcPendentesValor: 0 };
+  const summary = document.getElementById('orc-summary');
+  const syncSuffix = window._reisPrimaryDataState === 'synced'
+    ? ''
+    : window._reisPrimaryDataState === 'error'
+      ? ' · banco indisponível; valores podem estar desatualizados'
+      : ' · aguardando sincronização';
+  if (summary) summary.textContent = `${metrics.orcPendentes} pendentes · ${formatCurrencyBRL(metrics.orcPendentesValor)} em orçamentos pendentes${syncSuffix}`;
+  tbody.innerHTML = '';
 
   const lista = getFilteredOrcamentos();
   if (lista.length === 0) {
@@ -1499,7 +1545,12 @@ async function loadOrcamentoItens(orcamentoId) {
     .eq('orcamento_id', id)
     .order('created_at', { ascending: true });
 
-  if (error || !Array.isArray(data)) return [];
+  if (error) {
+    console.error(error);
+    showToast('Falha ao carregar os itens do orçamento.', 'error');
+    return null;
+  }
+  if (!Array.isArray(data)) return [];
   return data;
 }
 
@@ -1529,7 +1580,18 @@ async function openOrcamentoDetail(orcamentoId) {
   document.getElementById('orc-detail-code').textContent = orc.code || '—';
   document.getElementById('orc-detail-client').textContent = orc.client || '—';
   document.getElementById('orc-detail-valor').textContent = orc.valor || '—';
-  document.getElementById('orc-detail-margem').textContent = orc.margem || '—';
+  const costTotal = Array.isArray(itens) ? ReisFlowMetrics.calculateItemCost(itens) : null;
+  const saleValue = Number(orc.valorNumerico ?? ReisFlowMetrics.parseMoney(orc.valor));
+  const derivedMargin = costTotal === null ? null : ReisFlowMetrics.deriveMargin(saleValue, costTotal);
+  const costElement = document.getElementById('orc-detail-custo');
+  const displacementElement = document.getElementById('orc-detail-deslocamento');
+  const discountElement = document.getElementById('orc-detail-desconto');
+  const profitElement = document.getElementById('orc-detail-lucro');
+  if (costElement) costElement.textContent = costTotal === null ? 'Não disponível' : formatCurrencyBRL(costTotal);
+  if (displacementElement) displacementElement.textContent = orc.deslocamento == null ? 'Não registrado' : formatCurrencyBRL(orc.deslocamento);
+  if (discountElement) discountElement.textContent = orc.desconto == null ? 'Não registrado' : formatCurrencyBRL(orc.desconto);
+  if (profitElement) profitElement.textContent = costTotal === null ? 'Não calculável sem itens' : formatCurrencyBRL(ReisFlowMetrics.roundMoney(saleValue - costTotal));
+  document.getElementById('orc-detail-margem').textContent = derivedMargin === null ? 'Não calculável sem itens' : `${derivedMargin.toFixed(2)}%`;
   document.getElementById('orc-detail-validade').textContent = orc.validade || '—';
   document.getElementById('orc-detail-status').innerHTML = statusBadge(orc.status || 'pendente');
   document.getElementById('orc-detail-desc').textContent = orc.desc || '—';
@@ -1547,13 +1609,15 @@ async function openOrcamentoDetail(orcamentoId) {
 
   if (tbody) {
     tbody.innerHTML = '';
-    if (itens.length === 0) {
+    if (!Array.isArray(itens)) {
+      tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center">Itens indisponíveis; não foi possível calcular a margem.</td></tr>';
+    } else if (itens.length === 0) {
       tbody.innerHTML = '<tr><td colspan="4" class="muted" style="text-align:center">Sem itens cadastrados</td></tr>';
     } else {
       itens.forEach((item) => {
         const qtd = Number(item.quantidade || 0);
         const unit = Number(item.valor_unitario || 0);
-        const total = qtd * unit;
+        const total = ReisFlowMetrics.calculateItemCost([item]);
         tbody.innerHTML += `<tr><td>${item.descricao || '—'}</td><td>${qtd.toLocaleString('pt-BR')}</td><td>${unit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td>${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>`;
       });
     }
@@ -1588,7 +1652,18 @@ async function gerarPdfOrcamento(orcamentoId) {
   doc.text(`Cliente: ${orc.client || '—'}`, 14, y); y += 7;
   doc.text(`Descrição: ${orc.desc || '—'}`, 14, y); y += 7;
   doc.text(`Valor: ${orc.valor || '—'}`, 14, y); y += 7;
-  doc.text(`Margem: ${orc.margem || '—'}`, 14, y); y += 7;
+  const costTotal = Array.isArray(itens) ? ReisFlowMetrics.calculateItemCost(itens) : null;
+  const derivedMargin = costTotal === null ? null : ReisFlowMetrics.deriveMargin(orc.valorNumerico ?? orc.valor, costTotal);
+  doc.text(`Margem: ${derivedMargin === null ? 'não calculável sem itens' : `${derivedMargin.toFixed(2)}%`}`, 14, y); y += 7;
+  if (costTotal !== null) {
+    doc.text(`Custo dos itens: ${formatCurrencyBRL(costTotal)} | Lucro: ${formatCurrencyBRL(Number(orc.valorNumerico ?? ReisFlowMetrics.parseMoney(orc.valor)) - costTotal)}`, 14, y);
+    y += 7;
+  } else {
+    doc.text('Custo/lucro: não calculável sem itens carregados.', 14, y);
+    y += 7;
+  }
+  doc.text(`Deslocamento: ${orc.deslocamento == null ? 'não registrado' : formatCurrencyBRL(orc.deslocamento)} | Desconto: ${orc.desconto == null ? 'não registrado' : formatCurrencyBRL(orc.desconto)}`, 14, y);
+  y += 7;
   doc.text(`Validade: ${orc.validade || '—'}`, 14, y); y += 10;
 
   doc.setFontSize(12);
@@ -1596,13 +1671,15 @@ async function gerarPdfOrcamento(orcamentoId) {
   y += 8;
 
   doc.setFontSize(10);
-  if (itens.length === 0) {
+  if (!Array.isArray(itens)) {
+    doc.text('Itens indisponíveis; a composição financeira não foi incluída.', 14, y);
+  } else if (itens.length === 0) {
     doc.text('Sem itens cadastrados.', 14, y);
   } else {
     itens.forEach((item, index) => {
       const qtd = Number(item.quantidade || 0);
       const unit = Number(item.valor_unitario || 0);
-      const total = qtd * unit;
+      const total = ReisFlowMetrics.calculateItemCost([item]);
       const linha = `${index + 1}. ${item.descricao || '—'} | Qtd: ${qtd.toLocaleString('pt-BR')} | Unit: ${unit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
       const linhas = doc.splitTextToSize(linha, 182);
       doc.text(linhas, 14, y);
@@ -1658,13 +1735,32 @@ async function enviarOrcamento(orcamentoId) {
 
 function populateOrcPreview() {
   const container = document.getElementById('orc-preview-items');
-  if (!container || container.children.length > 0) return;
+  if (!container) return;
 
+  container.innerHTML = '';
   orcPreviewItems.forEach((item) => {
+    const unit = ReisFlowMetrics.parseMoney(item.unit);
+    const total = Number(item.qtd) * unit;
     container.innerHTML += `<div style="display:grid;grid-template-columns:1fr 80px 100px 90px;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
-      <span>${item.desc}</span><span style="text-align:center;color:var(--text-muted)">${item.qtd}</span><span style="color:var(--text-muted)">${item.unit}</span><span style="text-align:right;font-weight:600">${item.total}</span>
+      <span>${item.desc}</span><span style="text-align:center;color:var(--text-muted)">${item.qtd}</span><span style="color:var(--text-muted)">${formatCurrencyBRL(unit)}</span><span style="text-align:right;font-weight:600">${formatCurrencyBRL(total)}</span>
     </div>`;
   });
+  const calculation = ReisFlowMetrics.calculateBudget({
+    items: orcPreviewItems.map((item) => ({ quantity: item.qtd, unitPrice: item.unit })),
+    marginPercent: 32,
+    discount: 2000,
+    displacement: 0
+  });
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = value;
+  };
+  setText('orc-preview-costs', formatCurrencyBRL(calculation.itemCost));
+  setText('orc-preview-subtotal', formatCurrencyBRL(calculation.saleSubtotal));
+  setText('orc-preview-displacement', formatCurrencyBRL(calculation.displacement));
+  setText('orc-preview-discount', `-${formatCurrencyBRL(calculation.discount)}`);
+  setText('orc-preview-profit', formatCurrencyBRL(calculation.profit));
+  setText('orc-preview-total', formatCurrencyBRL(calculation.total));
 }
 
 // =============================================================
@@ -1673,18 +1769,22 @@ function populateOrcPreview() {
 //  reais que estão salvos no banco de dados.
 // =============================================================
 async function loadAllData() {
+  window._reisPrimaryDataState = 'loading';
+  window._reisPrimaryDataError = '';
   try {
-    const [resObras, resOrc, resCli, resFinRec, resFinPag] = await Promise.all([
+    const [resObras, resOrc, resOrcItens, resCli, resFinRec, resFinPag] = await Promise.all([
       db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }),
       db.from('orcamentos').select('*, clientes(nome), cliente_nome_avulso').order('created_at', { ascending: false }),
-      db.from('clientes').select('*').order('nome'),
-      db.from('financeiro_receber').select('referencia, descricao, valor, vencimento, status, created_at, clientes(nome), obras(codigo)').order('created_at', { ascending: false }),
-      db.from('financeiro_pagar').select('referencia, fornecedor, categoria, valor, vencimento, status, created_at').order('created_at', { ascending: false })
+      db.from('orcamento_itens').select('orcamento_id, quantidade, valor_unitario'),
+      db.from('clientes').select('*').order('created_at', { ascending: false }),
+      db.from('financeiro_receber').select('referencia, cliente_id, obra_id, descricao, valor, vencimento, status, paid_at, clientes(nome), obras(codigo)').order('vencimento', { ascending: true }),
+      db.from('financeiro_pagar').select('referencia, fornecedor, categoria, valor, vencimento, status, paid_at').order('vencimento', { ascending: true })
     ]);
 
     const queryErrors = [
       resObras?.error,
       resOrc?.error,
+      resOrcItens?.error,
       resCli?.error,
       resFinRec?.error,
       resFinPag?.error
@@ -1696,50 +1796,60 @@ async function loadAllData() {
 
     // Sobrescreve os arrays do sistema com dados reais
     obras.length = 0;
-    if (resObras.data && resObras.data.length > 0) {
-      resObras.data.forEach(o => {
-        obras.push({
-          id: o.id || null,
-          code: o.codigo,
-          name: o.nome,
-          client: o.clientes?.nome || '—',
-          clientId: o.cliente_id || null,
-          resp: o.responsavel_nome || '—',
-          prazo: o.prazo ? new Date(o.prazo).toLocaleDateString('pt-BR') : '—',
-          valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
-          status: o.status,
-          location: o.localizacao || '—'
-        });
+    (resObras.data || []).forEach((o) => {
+      const prazo = o.prazo || '';
+      obras.push({
+        id: o.id || null,
+        code: o.codigo,
+        name: o.nome,
+        client: o.clientes?.nome || '—',
+        clientId: o.cliente_id || null,
+        resp: o.responsavel_nome || '—',
+        prazo: prazo ? new Date(`${prazo}T00:00:00`).toLocaleDateString('pt-BR') : '—',
+        prazoIso: prazo,
+        valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
+        valorNumerico: Number(o.valor || 0),
+        custoPrevisto: null,
+        status: o.status,
+        location: o.localizacao || '—'
       });
-      // Força atualização da tabela ao reentrar na view
-      const tbody = document.getElementById('obras-tbody');
-      if (tbody) tbody.innerHTML = '';
-      const kanban = document.getElementById('obras-kanban');
-      if (kanban) kanban.innerHTML = '';
-    }
+    });
 
     orcamentos.length = 0;
-    if (resOrc.data && resOrc.data.length > 0) {
-      resOrc.data.forEach(o => {
-        orcamentos.push({
-          id: o.id || null,
-          code: o.codigo,
-          clientId: o.cliente_id || null,
-          client: o.clientes?.nome || o.cliente_nome_avulso || 'Cadastro pendente',
-          pendingClientName: o.cliente_nome_avulso || '',
-          desc: o.descricao,
-          valor: 'R$ ' + Number(o.valor).toLocaleString('pt-BR'),
-          margem: Number(o.margem_percentual).toFixed(0) + '%',
-          validade: o.validade ? new Date(o.validade).toLocaleDateString('pt-BR') : '—',
-          status: o.status
-        });
+    const costByBudget = new Map();
+    (resOrcItens.data || []).forEach((item) => {
+      const id = String(item.orcamento_id || '');
+      const cost = ReisFlowMetrics.calculateItemCost([item]);
+      costByBudget.set(id, ReisFlowMetrics.roundMoney((costByBudget.get(id) || 0) + cost));
+    });
+    (resOrc.data || []).forEach((o) => {
+      const value = Number(o.valor || 0);
+      const cost = costByBudget.has(String(o.id)) ? costByBudget.get(String(o.id)) : null;
+      const validity = o.validade || '';
+      const derivedMargin = cost === null ? null : ReisFlowMetrics.deriveMargin(value, cost);
+      orcamentos.push({
+        id: o.id || null,
+        code: o.codigo,
+        clientId: o.cliente_id || null,
+        client: o.clientes?.nome || o.cliente_nome_avulso || 'Cadastro pendente',
+        pendingClientName: o.cliente_nome_avulso || '',
+        desc: o.descricao,
+        valor: 'R$ ' + value.toLocaleString('pt-BR'),
+        valorNumerico: value,
+        margem: derivedMargin === null ? '—' : `${derivedMargin.toFixed(2)}%`,
+        margemArmazenada: o.margem_percentual,
+        custoItens: cost,
+        desconto: o.desconto == null ? null : Number(o.desconto),
+        deslocamento: o.deslocamento == null ? null : Number(o.deslocamento),
+        validade: validity ? new Date(`${validity}T00:00:00`).toLocaleDateString('pt-BR') : '—',
+        validadeIso: validity,
+        statusOriginal: o.status,
+        status: ReisFlowMetrics.getEffectiveBudgetStatus(o.status, validity)
       });
-      const orcTbody = document.getElementById('orc-tbody');
-      if (orcTbody) orcTbody.innerHTML = '';
-    }
+    });
 
     clientes.length = 0;
-    if (resCli.data && resCli.data.length > 0) {
+    {
       const cores = [
         'linear-gradient(135deg,#1B4F6B,#2176A3)',
         'linear-gradient(135deg,#4A1B8F,#7B3FC4)',
@@ -1748,7 +1858,7 @@ async function loadAllData() {
         'linear-gradient(135deg,#1A1D24,#3A4055)',
         'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
       ];
-      resCli.data.forEach((c, i) => {
+      (resCli.data || []).forEach((c, i) => {
         const partes = c.nome.split(' ');
         const iniciais = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : c.nome.slice(0, 2);
         const emailLocal = typeof getClienteEmailByDoc === 'function' ? getClienteEmailByDoc(c.documento) : '';
@@ -1766,22 +1876,25 @@ async function loadAllData() {
           bg: cores[i % cores.length]
         });
       });
-      const cliTbody = document.getElementById('cli-tbody');
-      if (cliTbody) cliTbody.innerHTML = '';
     }
 
     if (typeof financRec !== 'undefined' && Array.isArray(financRec)) {
       financRec.length = 0;
       (resFinRec.data || []).forEach((item) => {
+        const dueDate = item.vencimento || '';
         financRec.push({
           ref: item.referencia,
+          clientId: item.cliente_id || null,
+          obraId: item.obra_id || null,
           client: item.clientes?.nome || '—',
           obra: item.obras?.codigo || '—',
           desc: item.descricao,
+          valorNumerico: Number(item.valor || 0),
           valor: 'R$ ' + Number(item.valor || 0).toLocaleString('pt-BR'),
-          venc: item.vencimento ? new Date(item.vencimento).toLocaleDateString('pt-BR') : '—',
+          vencimento: dueDate,
+          venc: dueDate ? new Date(`${dueDate}T00:00:00`).toLocaleDateString('pt-BR') : '—',
           status: item.status,
-          updatedAt: item.created_at || null
+          paidAt: item.paid_at || null
         });
       });
     }
@@ -1789,21 +1902,37 @@ async function loadAllData() {
     if (typeof financPag !== 'undefined' && Array.isArray(financPag)) {
       financPag.length = 0;
       (resFinPag.data || []).forEach((item) => {
+        const dueDate = item.vencimento || '';
         financPag.push({
           ref: item.referencia,
           forn: item.fornecedor,
           cat: item.categoria || '—',
+          valorNumerico: Number(item.valor || 0),
           valor: 'R$ ' + Number(item.valor || 0).toLocaleString('pt-BR'),
-          venc: item.vencimento ? new Date(item.vencimento).toLocaleDateString('pt-BR') : '—',
+          vencimento: dueDate,
+          venc: dueDate ? new Date(`${dueDate}T00:00:00`).toLocaleDateString('pt-BR') : '—',
           status: item.status,
-          updatedAt: item.created_at || null
+          paidAt: item.paid_at || null
         });
       });
     }
 
+    window._reisPrimaryDataState = 'synced';
+    window._reisPrimaryDataError = '';
     updateClientesSummary();
+    populateObras();
+    populateOrc();
+    populateClientes();
+    if (typeof populateFin === 'function') populateFin();
   } catch (err) {
-    console.warn('Falha ao carregar dados do Supabase.', err);
+    obras.length = 0;
+    orcamentos.length = 0;
+    clientes.length = 0;
+    financRec.length = 0;
+    financPag.length = 0;
+    window._reisPrimaryDataState = 'error';
+    window._reisPrimaryDataError = String(err?.message || err || 'Falha desconhecida ao carregar os dados.');
+    console.error('Falha ao carregar dados do Supabase.', err);
     const raw = String(err?.message || '').toLowerCase();
     if (
       raw.includes('jwt')
@@ -1816,6 +1945,13 @@ async function loadAllData() {
     } else {
       showToast('Erro ao carregar dados do banco. Verifique autenticação/permissões.', 'error');
     }
+  }
+
+  if (window._reisPrimaryDataState === 'error') {
+    populateObras();
+    populateOrc();
+    populateClientes();
+    if (typeof populateFin === 'function') populateFin();
   }
 
   if (typeof refreshNotificationBadge === 'function') {
@@ -1839,7 +1975,12 @@ function updateClientesSummary() {
     return normalizeFilterValue(c?.status) === 'inativo';
   }).length;
 
-  summaryEl.textContent = `${total} clientes cadastrados · ${ativos} ativos · ${inativos} inativos`;
+  const suffix = window._reisPrimaryDataState === 'synced'
+    ? ''
+    : window._reisPrimaryDataState === 'error'
+      ? ' · falha ao sincronizar; dados exibidos podem estar desatualizados'
+      : ' · aguardando sincronização';
+  summaryEl.textContent = `${total} clientes cadastrados · ${ativos} ativos · ${inativos} inativos${suffix}`;
 }
 
 function getClientesFilteredList() {
@@ -1872,13 +2013,14 @@ function renderClientesTableRows(lista) {
 
   tbody.innerHTML = '';
   lista.forEach((cliente) => {
+    const metrics = getClienteDashboardMetrics(cliente);
     const docEncoded = encodeURIComponent(cliente.doc || '');
     tbody.innerHTML += `<tr onclick="viewCliente('${docEncoded}')" style="cursor:pointer">
       <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:${cliente.bg}">${cliente.initials}</div><div><div class="bold">${cliente.name}</div><div style="font-size:11px;color:var(--text-muted)">${cliente.tipo}</div></div></div></td>
       <td class="mono" style="font-size:11px">${cliente.doc}</td>
       <td class="muted">${cliente.tel}</td>
-      <td><span class="badge badge-info">${cliente.obras} obras</span></td>
-      <td><span class="profit-up"><i class="ti ti-trending-up"></i>${cliente.total}</span></td>
+      <td><span class="badge badge-info">${metrics.totalObras} obras</span></td>
+      <td><span class="profit-up"><i class="ti ti-trending-up"></i>${formatCurrencyBRL(metrics.valorContratado)}</span></td>
       <td>${statusBadge(cliente.status)}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editCliente('${docEncoded}')"><i class="ti ti-edit"></i></button>
@@ -1933,33 +2075,43 @@ function formatCurrencyBRL(value) {
 
 function getClienteDashboardMetrics(cliente) {
   const nomeCliente = normalizeFilterValue(cliente?.name || '');
-  const obrasCliente = (Array.isArray(obras) ? obras : []).filter((obra) => normalizeFilterValue(obra.client) === nomeCliente);
+  const clienteId = String(cliente?.id || '').trim();
+  const obrasCliente = (Array.isArray(obras) ? obras : []).filter((obra) => {
+    const obraClienteId = String(obra?.clientId || '').trim();
+    if (clienteId && obraClienteId) return obraClienteId === clienteId;
+    return normalizeFilterValue(obra?.client) === nomeCliente;
+  });
 
   const totalObras = obrasCliente.length;
-  const finalizadas = obrasCliente.filter((obra) => obra.status === 'concluida').length;
-  const andamento = obrasCliente.filter((obra) => obra.status === 'andamento').length;
-  const atraso = obrasCliente.filter((obra) => obra.status === 'atrasada').length;
-  const valorContratado = obrasCliente.reduce((sum, obra) => sum + parseCurrencyBRL(obra.valor), 0);
+  const finalizadas = obrasCliente.filter((obra) => ReisFlowMetrics.normalizeStatus(obra.status) === 'concluida').length;
+  const andamento = obrasCliente.filter((obra) => ReisFlowMetrics.normalizeStatus(obra.status) === 'andamento').length;
+  const atraso = obrasCliente.filter((obra) => ReisFlowMetrics.normalizeStatus(obra.status) === 'atrasada').length;
+  const valorContratado = obrasCliente.reduce((sum, obra) => sum + Number(obra.valorNumerico ?? parseCurrencyBRL(obra.valor)), 0);
 
   const obraCodes = new Set(obrasCliente.map((obra) => String(obra.code || '').trim()).filter(Boolean));
+  const obraIds = new Set(obrasCliente.map((obra) => String(obra.id || '').trim()).filter(Boolean));
   const lancamentosReceber = (typeof financRec !== 'undefined' && Array.isArray(financRec) ? financRec : []).filter((item) => {
+    const itemClientId = String(item.clientId || '').trim();
+    if (clienteId && itemClientId) return itemClientId === clienteId;
+    const itemObraId = String(item.obraId || '').trim();
+    if (itemObraId) return obraIds.has(itemObraId);
     const byCode = obraCodes.has(String(item.obra || '').trim());
     const nomeItem = normalizeFilterValue(item.client || '');
-    const byName = nomeItem === nomeCliente || nomeItem.includes(nomeCliente) || nomeCliente.includes(nomeItem);
+    const byName = !!nomeItem && nomeItem === nomeCliente;
     return byCode || byName;
   });
 
   const valorRecebido = lancamentosReceber
-    .filter((item) => ['recebido', 'pago'].includes(normalizeFilterValue(item.status)))
-    .reduce((sum, item) => sum + parseCurrencyBRL(item.valor), 0);
+    .filter((item) => ReisFlowMetrics.getPaymentState(item) === 'quitado')
+    .reduce((sum, item) => sum + Number(item.valorNumerico ?? parseCurrencyBRL(item.valor)), 0);
 
   const valorAReceber = lancamentosReceber
-    .filter((item) => !['recebido', 'pago'].includes(normalizeFilterValue(item.status)))
-    .reduce((sum, item) => sum + parseCurrencyBRL(item.valor), 0);
+    .filter((item) => ReisFlowMetrics.getPaymentState(item) === 'aberto')
+    .reduce((sum, item) => sum + Number(item.valorNumerico ?? parseCurrencyBRL(item.valor)), 0);
 
   const valorVencido = lancamentosReceber
-    .filter((item) => normalizeFilterValue(item.status) === 'vencido')
-    .reduce((sum, item) => sum + parseCurrencyBRL(item.valor), 0);
+    .filter((item) => ReisFlowMetrics.getTemporalState(item) === 'vencido')
+    .reduce((sum, item) => sum + Number(item.valorNumerico ?? parseCurrencyBRL(item.valor)), 0);
 
   return {
     totalObras,
@@ -2006,8 +2158,8 @@ function viewCliente(encodedDoc) {
   document.getElementById('cliente-detail-tipo').textContent = cliente.tipo || '—';
   document.getElementById('cliente-detail-doc').textContent = cliente.doc || '—';
   document.getElementById('cliente-detail-tel').textContent = cliente.tel || '—';
-  document.getElementById('cliente-detail-obras').textContent = String(cliente.obras ?? '—');
-  document.getElementById('cliente-detail-total').textContent = cliente.total || '—';
+  document.getElementById('cliente-detail-obras').textContent = '—';
+  document.getElementById('cliente-detail-total').textContent = '—';
   document.getElementById('cliente-detail-status').innerHTML = statusBadge(cliente.status || 'ativo');
   const clienteDetailDoc = document.getElementById('cliente-detail-doc-value');
   const clienteDetailStatus = document.getElementById('cliente-detail-status-value');
@@ -2021,6 +2173,8 @@ function viewCliente(encodedDoc) {
   }
 
   const metrics = getClienteDashboardMetrics(cliente);
+  document.getElementById('cliente-detail-obras').textContent = String(metrics.totalObras);
+  document.getElementById('cliente-detail-total').textContent = formatCurrencyBRL(metrics.valorContratado);
   document.getElementById('cliente-kpi-finalizadas').textContent = String(metrics.finalizadas);
   document.getElementById('cliente-kpi-andamento').textContent = String(metrics.andamento);
   document.getElementById('cliente-kpi-atraso').textContent = String(metrics.atraso);

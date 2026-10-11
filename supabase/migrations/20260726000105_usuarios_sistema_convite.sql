@@ -47,4 +47,8 @@ for all to authenticated
 using (public.app_has_role(array['admin','gestor']::text[]))
 with check (public.app_has_role(array['admin','gestor']::text[]));
 
+drop policy if exists bootstrap_deny_authenticated on public.usuarios_sistema;
+create policy bootstrap_deny_authenticated on public.usuarios_sistema
+as restrictive for all to authenticated using (false) with check (false);
+
 commit;

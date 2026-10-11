@@ -21,7 +21,7 @@ window._orcamentoClienteContext = window._orcamentoClienteContext || {
 
 function lerMapaEmailsClientes() {
   try {
-    const raw = localStorage.getItem(CLIENTE_EMAILS_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(CLIENTE_EMAILS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
@@ -30,7 +30,7 @@ function lerMapaEmailsClientes() {
 }
 
 function salvarMapaEmailsClientes(mapa) {
-  localStorage.setItem(CLIENTE_EMAILS_STORAGE_KEY, JSON.stringify(mapa || {}));
+  window.ReisFlowTenantStorage?.setItem(CLIENTE_EMAILS_STORAGE_KEY, JSON.stringify(mapa || {}));
 }
 
 function salvarEmailClientePorDoc(doc, email) {
@@ -68,8 +68,12 @@ function isErroPermissao(error) {
 }
 
 function lerClientesDemoLocal() {
+  if (typeof isLocalHost === 'function' && !isLocalHost()) {
+    return [];
+  }
+
   try {
-    const raw = localStorage.getItem(CRUD_DEMO_CLIENTES_STORAGE_KEY);
+    const raw = window.ReisFlowTenantStorage?.getItem(CRUD_DEMO_CLIENTES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -79,7 +83,11 @@ function lerClientesDemoLocal() {
 }
 
 function salvarClientesDemoLocal(lista) {
-  localStorage.setItem(CRUD_DEMO_CLIENTES_STORAGE_KEY, JSON.stringify(Array.isArray(lista) ? lista : []));
+  if (typeof isLocalHost === 'function' && !isLocalHost()) {
+    return;
+  }
+
+  window.ReisFlowTenantStorage?.setItem(CRUD_DEMO_CLIENTES_STORAGE_KEY, JSON.stringify(Array.isArray(lista) ? lista : []));
 }
 
 async function hasAuthenticatedSupabaseSession() {
@@ -91,10 +99,26 @@ async function hasAuthenticatedSupabaseSession() {
   }
 }
 
+function isValidUuid(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+}
+
 function isLocalSessionlessMode(hasSupabaseSession) {
   return typeof isLocalHost === 'function'
     && isLocalHost()
     && !hasSupabaseSession;
+}
+
+function isProductionRuntime() {
+  return typeof isLocalHost === 'function' ? !isLocalHost() : true;
+}
+
+function blockLocalOnlyBehavior(message = 'Este recurso é apenas para ambiente local.') {
+  if (isProductionRuntime()) {
+    showToast(message, 'warning');
+    return true;
+  }
+  return false;
 }
 
 function buildClienteUiRecord({ id, nome, tipo, doc, tel, email, status }, index = 0) {
@@ -554,8 +578,14 @@ function resetOrcamentoModal() {
   const desconto = document.getElementById('modal-desconto');
   const desloc = document.getElementById('modal-desloc');
   if (margem) margem.value = '30';
-  if (desconto) desconto.value = '0';
-  if (desloc) desloc.value = '0';
+  if (desconto) {
+    desconto.value = '0';
+    desconto.dataset.legacyValueUnknown = 'false';
+  }
+  if (desloc) {
+    desloc.value = '0';
+    desloc.dataset.legacyValueUnknown = 'false';
+  }
 
   const linhas = document.getElementById('orc-modal-lines');
   if (linhas) {
@@ -599,6 +629,8 @@ async function editOrcamento(orcamentoId) {
   const clienteSel = document.getElementById('orc-cliente-id');
   const descricao = document.getElementById('orc-descricao');
   const margem = document.getElementById('modal-margem');
+  const desconto = document.getElementById('modal-desconto');
+  const desloc = document.getElementById('modal-desloc');
   const validadeInfo = document.getElementById('orc-validade-info');
 
   if (title) {
@@ -611,6 +643,14 @@ async function editOrcamento(orcamentoId) {
   if (clienteSel) clienteSel.value = registro.clientId || '';
   if (descricao) descricao.value = registro.desc || '';
   if (margem) margem.value = String(parseFloat(String(registro.margem || '').replace(',', '.')) || 0);
+  if (desconto) {
+    desconto.value = registro.desconto == null ? '' : String(registro.desconto);
+    desconto.dataset.legacyValueUnknown = registro.desconto == null ? 'true' : 'false';
+  }
+  if (desloc) {
+    desloc.value = registro.deslocamento == null ? '' : String(registro.deslocamento);
+    desloc.dataset.legacyValueUnknown = registro.deslocamento == null ? 'true' : 'false';
+  }
   if (validadeInfo) {
     validadeInfo.textContent = `Validade atual: ${registro.validade || '—'} · nova validade automática ao salvar: ${formatarDataPtBr(getValidadeAutomaticaIso())}.`;
   }
@@ -1642,17 +1682,23 @@ async function salvarOrcamento() {
   const clienteMode = document.getElementById('orc-cliente-mode')?.value || 'selected';
   const descricao  = document.getElementById('orc-descricao').value.trim();
   const validade   = getValidadeAutomaticaIso();
-  const margem     = parseFloat(document.getElementById('modal-margem').value) || 0;
-
-  // Calcula o valor total a partir das linhas do modal
-  let subtotal = 0;
-  document.querySelectorAll('#orc-modal-lines .budget-line').forEach(line => {
-    const inputs = line.querySelectorAll('input');
-    subtotal += (parseFloat(inputs[1].value) || 0) * (typeof parseMoedaDigitada === 'function' ? parseMoedaDigitada(inputs[2].value) : parseMoeda(inputs[2].value));
-  });
-  const desconto     = parseFloat(document.getElementById('modal-desconto').value) || 0;
-  const deslocamento = parseFloat(document.getElementById('modal-desloc').value) || 0;
-  const valor        = subtotal + subtotal * (margem / 100) + deslocamento - desconto;
+  const calculation = typeof calcTotals === 'function' ? calcTotals() : null;
+  if (!calculation) {
+    showToast('Revise a margem, o desconto e o deslocamento antes de salvar.', 'warning');
+    return;
+  }
+  const descontoInput = document.getElementById('modal-desconto');
+  const deslocamentoInput = document.getElementById('modal-desloc');
+  const legacyComponentsUnconfirmed = [descontoInput, deslocamentoInput]
+    .some((input) => input?.dataset.legacyValueUnknown === 'true' && !String(input.value || '').trim());
+  if (legacyComponentsUnconfirmed) {
+    showToast('Informe desconto e deslocamento do orçamento antigo antes de salvar.', 'warning');
+    return;
+  }
+  const margem = parseFloat(document.getElementById('modal-margem').value) || 0;
+  const desconto = Number(document.getElementById('modal-desconto').value || 0);
+  const deslocamento = Number(document.getElementById('modal-desloc').value || 0);
+  const valor = calculation.total;
 
   if (!descricao) { showToast('Informe a descrição do serviço', 'warning'); return; }
 
@@ -1726,6 +1772,8 @@ async function salvarOrcamento() {
         descricao,
         valor: valor > 0 ? valor : 0,
         margem_percentual: margem,
+        desconto,
+        deslocamento,
         validade,
         status: statusOrcamento
       })
@@ -1745,6 +1793,8 @@ async function salvarOrcamento() {
       descricao,
       valor: valor > 0 ? valor : 0,
       margem_percentual: margem,
+      desconto,
+      deslocamento,
       validade,
       status: statusOrcamento
     }).select('id, codigo').single();
@@ -1960,17 +2010,35 @@ async function toggleClienteStatus(source = 'edit') {
   const novoStatus = statusAtual === 'ativo' ? 'inativo' : 'ativo';
 
   let error = null;
-  if (clienteAtual.id) {
+  const clienteId = String(clienteAtual.id || '').trim();
+  const clienteEhLocal = !clienteId || !isValidUuid(clienteId);
+  const hasSupabaseSession = await hasAuthenticatedSupabaseSession();
+  const isLocalFallback = isLocalSessionlessMode(hasSupabaseSession)
+    || (typeof isLocalHost === 'function' && isLocalHost() && typeof isLocalAdminSession === 'function' && isLocalAdminSession() && !hasSupabaseSession);
+
+  if (!clienteEhLocal && clienteId) {
     const result = await db
       .from('clientes')
       .update({ status: novoStatus })
-      .eq('id', clienteAtual.id);
+      .eq('id', clienteId);
     error = result.error || null;
   } else {
     const docRef = String(editDoc || '').replace(/\D/g, '');
     const index = clientes.findIndex((c) => String(c.doc || '').replace(/\D/g, '') === docRef);
     if (index >= 0) {
       clientes[index] = { ...clientes[index], status: novoStatus };
+    }
+
+    if (isLocalFallback) {
+      const localList = lerClientesDemoLocal();
+      const localIndex = localList.findIndex((item) => {
+        const itemDoc = String(item.documento || '').replace(/\D/g, '');
+        return !!itemDoc && itemDoc === docRef;
+      });
+      if (localIndex >= 0) {
+        localList[localIndex] = { ...localList[localIndex], status: novoStatus };
+        salvarClientesDemoLocal(localList);
+      }
     }
   }
 

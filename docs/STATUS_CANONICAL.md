@@ -25,9 +25,15 @@ Observacao:
 
 Valores canonicos:
 - pendente
+- cliente_pendente
 - aprovado
 - reprovado
-- expirado
+- dados_incompletos
+
+Estado derivado (nao persistido):
+- expirado: status `cliente_pendente` cuja validade terminou antes de hoje
+
+`pendente` representa um orcamento ainda nao enviado. Apenas `cliente_pendente` expira; aprovados, reprovados e `dados_incompletos` preservam o status.
 
 ---
 
@@ -56,6 +62,11 @@ A pagar:
 Regra de interpretacao KPI:
 - status quitado = recebido/pago
 - status aberto = pendente/vencido/futuro
+- situacao temporal e estado de pagamento sao conceitos separados na interface
+- vencimento: vencido antes de hoje, vence hoje na data corrente, a vencer depois de hoje
+- vencimento em ate 7 dias: hoje ate hoje + 7 dias, inclusive; exclui vencidos e quitados
+- faturamento mensal usa `paid_at` no fuso `America/Sao_Paulo`, nao a data de criacao nem o vencimento
+- registros antigos sem `paid_at` nao sao atribuidos a um mes sem evidencia
 
 ---
 

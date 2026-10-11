@@ -21,14 +21,19 @@
 
 Resultado esperado: tabelas criadas com sucesso.
 
-## 3) Inserir dados iniciais (seed)
+## 3) Aplicar todas as migrations (antes de publicar ou conectar o front-end)
 
-1. Ainda no `SQL Editor`, clique em `New query`.
-2. Abra o arquivo `supabase/seed.sql`.
-3. Copie todo o conteudo e cole no editor.
-4. Clique em `Run`.
+1. Aplique, em ordem cronologica, todos os arquivos de `supabase/migrations/`.
+2. Confirme que a ultima migration aplicada e `20261009000112_account_isolation_hardening.sql`.
+3. Mantenha o aplicativo indisponivel ate a migration multi-tenant final concluir.
 
-Resultado esperado: clientes, obras e outros registros de exemplo inseridos.
+O `schema.sql` e somente a estrutura-base e bloqueia o acesso autenticado ate as
+migrations de isolamento serem instaladas. Nao publique chaves nem libere login
+entre a aplicacao do schema e a ultima migration.
+
+**Nao execute `supabase/seed.sql` em producao.** Ele contem dados de exemplo e
+operacoes destrutivas. Use-o somente em um banco local descartavel, com fixtures
+sinteticas, depois de confirmar o conteudo do script.
 
 ## 4) Pegar as chaves para conectar no front-end
 
@@ -44,19 +49,16 @@ Guarde esses dados, porque no proximo passo vamos conectar seu site com o banco.
 
 1. No menu da esquerda, clique em `Table Editor`.
 2. Abra as tabelas `clientes`, `obras` e `orcamentos`.
-3. Verifique se existem registros.
+3. Contas novas devem iniciar sem registros de negocio. Registros preexistentes
+   nao devem ser apagados nem reatribuidos automaticamente: contas antigas sem
+   membership verificada recebem uma organizacao vazia, e os dados legados
+   permanecem bloqueados ate recuperacao administrativa por fonte confiavel.
+4. Valide a separacao com o roteiro inteiramente sintetico
+   `supabase/tests/account_isolation.sql`, somente em banco local ou de teste.
 
-Se aparecer dados nessas tabelas, o banco foi criado com sucesso.
+Nao use registros de producao para reproduzir ou testar o isolamento.
 
-## 5.1) Aplicar a base de Usuarios e Permissoes
-
-1. Abra o arquivo `supabase/migrations/20260726_005_usuarios_sistema_convite.sql`.
-2. Copie o conteudo e cole no `SQL Editor` do Supabase.
-3. Clique em `Run`.
-
-Resultado esperado: a tabela `usuarios_sistema` fica criada com RLS e policies por perfil.
-
-## 5.2) Publicar a Edge Function de convite
+## 5.1) Publicar a Edge Function de convite
 
 1. Instale e autentique o Supabase CLI na sua maquina.
 2. Defina as secrets da funcao com `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
@@ -67,6 +69,10 @@ supabase functions deploy invite-user
 ```
 
 Resultado esperado: o fluxo de convite passa a chamar a funcao e enviar o e-mail pelo Supabase.
+
+Convites e bloqueios devem passar por `invite-user`, que valida a associacao da
+equipe e do administrador no mesmo tenant. Nao grave `empresa_id`, papel de
+autorizacao ou senha temporaria diretamente pelo navegador.
 
 ## 6) Validar no dominio provisório
 
@@ -93,5 +99,3 @@ Observacao importante:
 
 - O botao do template de recovery usa `{{ .ConfirmationURL }}` (padrao oficial do Supabase).
 - No front-end, o `redirectTo` do reset esta configurado para `index.html?recovery=1` como fallback.
-
-

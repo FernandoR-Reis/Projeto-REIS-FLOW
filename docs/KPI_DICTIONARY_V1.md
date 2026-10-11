@@ -1,89 +1,81 @@
-# Dicionario de KPIs v1 (baseline)
+# Dicionario de KPIs v1
 
 Objetivo:
-- congelar as formulas atuais do dashboard para evitar ambiguidade durante a migracao
-- separar KPI estatico, KPI dinamico e KPI em transicao
+- documentar formulas, fontes e limites dos KPIs do REIS FLOW
+- separar valores confirmados de dados indisponiveis ou ainda sem fonte
 
 Legenda:
-- Status implementacao: estatico | dinamico | transicao
-- Fonte atual: html fixo | js (array em memoria) | supabase
+- Status implementacao: dinamico | parcial | indisponivel
+- Fonte atual indica a fonte esperada; a interface informa quando a sincronizacao nao foi confirmada
 
 ---
 
 ## Dashboard - Cards principais
 
 1) Obras Ativas
-- Status implementacao: estatico
-- Valor atual exibido: 18
-- Fonte atual: html fixo
-- Formula alvo: contagem de obras com status em (andamento, aprovada)
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`obras`)
+- Formula: contagem de obras com status em (andamento, aprovada)
 
 2) Obras Atrasadas
-- Status implementacao: estatico
-- Valor atual exibido: 4
-- Fonte atual: html fixo
-- Formula alvo: contagem de obras com status = atrasada
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`obras`)
+- Formula: contagem de obras com status = atrasada
 
 3) Faturamento Mensal
-- Status implementacao: estatico
-- Valor atual exibido: R$287k
-- Fonte atual: html fixo
-- Formula alvo: soma de recebimentos quitados no mes
+- Status implementacao: parcial
+- Fonte atual: Supabase (`financeiro_receber`)
+- Formula: soma de recebimentos quitados com `paid_at` no mes selecionado, usando `America/Sao_Paulo`
+- Limitacao: baixas anteriores a `paid_at` permanecem sem mes atribuivel; nao ha backfill presumido
 
 4) Lucro Previsto
-- Status implementacao: estatico
-- Valor atual exibido: R$94k
-- Fonte atual: html fixo
-- Formula alvo: receitas previstas - custos previstos
+- Status implementacao: indisponivel
+- Fonte atual: nenhuma
+- Formula: nao exibida. O schema atual nao fornece custo previsto por obra; nao estimar lucro sem fonte
 
 5) Orc. Pendentes
-- Status implementacao: estatico
-- Valor atual exibido: 9
-- Fonte atual: html fixo
-- Formula alvo: contagem de orcamentos com status = pendente
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`orcamentos`)
+- Formula: contagem e soma dos orcamentos em status = pendente; orcamentos enviados ao cliente usam status `cliente_pendente`
 
 6) Equipes em Campo
-- Status implementacao: dinamico
-- Fonte atual: js (equipeData em memoria/localStorage)
+- Status implementacao: parcial
+- Fonte atual: Supabase (`equipe`) com cache local identificado
 - Formula atual: count(status == campo)
-- Observacao: ainda nao Supabase-first
 
 7) Contas Vencendo
-- Status implementacao: estatico
-- Valor atual exibido: R$43k
-- Fonte atual: html fixo
-- Formula alvo: soma de titulos com vencimento em ate 7 dias e nao quitados
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`financeiro_receber` + `financeiro_pagar`)
+- Formula: soma de titulos abertos com vencimento de hoje ate hoje + 7 dias, inclusive; vencidos e quitados sao excluidos
 
 8) A Receber
-- Status implementacao: estatico
-- Valor atual exibido: R$168k
-- Fonte atual: html fixo
-- Formula alvo: soma de financeiro_receber com status aberto
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`financeiro_receber`)
+- Formula: soma de recebiveis em aberto, incluindo vencidos e futuros
 
 9) Estoque Critico
-- Status implementacao: dinamico
-- Fonte atual: js (estoqueData em memoria/localStorage)
+- Status implementacao: parcial
+- Fonte atual: Supabase (`estoque_itens` + `estoque_movimentos`) com cache local identificado
 - Formula atual: count(qtd < min)
-- Observacao: ainda sem trilha de movimentos no banco
 
 ---
 
 ## Dashboard - Demais blocos
 
 10) Grafico de faturamento mensal
-- Status implementacao: estatico
-- Fonte atual: buildDashChart com serie fixa
-- Formula alvo: agregacao mensal real do financeiro
+- Status implementacao: dinamico
+- Fonte atual: agregacao de `financeiro_receber.paid_at`
+- Formula: soma de recebimentos quitados por mes nos seis meses terminados no mes selecionado
 
 11) Status das obras (percentuais)
-- Status implementacao: estatico
-- Fonte atual: html fixo
-- Formula alvo: distribuicao real por status em obras
+- Status implementacao: dinamico
+- Fonte atual: Supabase (`obras`)
+- Formula: contagem por status dividida pelo total de obras sincronizadas
 
 12) Clientes recentes / ultimas obras / tarefas pendentes
-- Status implementacao: estatico
-- Fonte atual: html fixo
-- Formula alvo: listas reais por created_at / updated_at
+- Status implementacao: parcial
+- Fonte atual: Supabase (`clientes`, `obras`)
+- Formula: ultimos registros na ordem recebida da consulta; tarefas nao possuem fonte integrada e nao sao apresentadas como dado confirmado
 
 ---
 
@@ -107,9 +99,10 @@ Legenda:
 
 ---
 
-## Lacunas criticas para v2
+## Limitacoes e rollout
 
-- padronizar formula oficial de cada KPI em funcao unica de metricas
-- remover hardcode de cards e graficos no dashboard
-- migrar KPIs de Equipes/Estoque para fonte Supabase-first
-- incluir metadados de auditoria por KPI: periodo, contagem, atualizado_em
+- aplicar a migracao `20261008000111_metric_inputs.sql` em ambiente seguro antes de usar os novos campos `desconto`, `deslocamento` e `paid_at`
+- registros antigos sem os novos campos permanecem sem valor confirmado; edicao exige confirmacao explicita de desconto e deslocamento
+- custo previsto de obra, lucro previsto e tarefas permanecem indisponiveis ate existir fonte confiavel
+- registros especificos do relatorio de QA nao puderam ser correlacionados com fixtures sanitizadas; as regras genericas estao cobertas por testes locais
+- nenhuma migracao foi aplicada e nenhuma alteracao foi gravada em producao durante a correcao

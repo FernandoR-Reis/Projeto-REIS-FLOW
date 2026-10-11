@@ -6,8 +6,6 @@ type InvitePayload = {
   email: string;
   perfil: string;
   status?: string;
-  senha_temporaria?: string;
-  empresa?: string;
 };
 
 const corsHeaders = {
@@ -49,14 +47,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profile } = await adminClient
-      .from('profiles')
-      .select('cargo')
-      .eq('id', caller.id)
+    const { data: membership, error: membershipError } = await adminClient
+      .from('tenant_memberships')
+      .select('empresa_id, role, active')
+      .eq('user_id', caller.id)
       .maybeSingle();
 
-    const role = String(profile?.cargo || '').toLowerCase();
-    if (!['admin', 'gestor'].includes(role)) {
+    if (membershipError || !membership?.empresa_id || !membership.active) {
+      return new Response(JSON.stringify({ error: 'Caller has no verified organization membership.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!['admin', 'gestor'].includes(String(membership.role || '').toLowerCase())) {
       return new Response(JSON.stringify({ error: 'Forbidden.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -69,8 +73,21 @@ Deno.serve(async (req) => {
     const email = String(payload?.email || '').trim().toLowerCase();
     const perfilConvite = String(payload?.perfil || 'Visualizador').trim();
     const status = String(payload?.status || 'convite_pendente').trim();
-    const senhaTemporaria = String(payload?.senha_temporaria || '').trim() || null;
-    const empresa = String(payload?.empresa || 'REIS FLOW').trim();
+    const normalizedProfile = perfilConvite.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const invitedRole = ({
+      administrador: 'admin',
+      admin: 'admin',
+      gerente: 'gestor',
+      gestor: 'gestor',
+      financeiro: 'financeiro',
+      'auxiliar financeiro': 'financeiro',
+      visualizador: 'visualizador',
+      comercial: 'operador',
+      compras: 'operador',
+      estoque: 'operador',
+      obras: 'operador',
+      rh: 'operador',
+    } as Record<string, string>)[normalizedProfile];
 
     if (!equipeId || !nome || !email) {
       return new Response(JSON.stringify({ error: 'Missing required fields.' }), {
@@ -78,32 +95,113 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    if (!['ativo', 'bloqueado', 'convite_pendente'].includes(status)) {
+      return new Response(JSON.stringify({ error: 'Invalid invite status.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!invitedRole) {
+      return new Response(JSON.stringify({ error: 'Invalid organization role.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (membership.role !== 'admin' && ['admin', 'gestor'].includes(invitedRole)) {
+      return new Response(JSON.stringify({ error: 'Only an organization admin may assign an admin or manager role.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: company, error: companyError } = await adminClient
+      .from('empresas')
+      .select('id, nome, status')
+      .eq('id', membership.empresa_id)
+      .maybeSingle();
+
+    if (companyError || !company || company.status !== 'ativo') {
+      return new Response(JSON.stringify({ error: 'Verified organization not found.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { data: equipe } = await adminClient
       .from('equipe')
-      .select('id, nome, email')
+      .select('id, nome, email, empresa_id')
       .eq('id', equipeId)
       .maybeSingle();
 
-    if (!equipe) {
+    if (!equipe || equipe.empresa_id !== membership.empresa_id) {
       return new Response(JSON.stringify({ error: 'Colaborador não encontrado.' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { data: existingUser } = await adminClient.auth.admin.listUsers();
-    const matchedAuthUser = existingUser?.users?.find((item) => String(item.email || '').toLowerCase() === email) || null;
+    const { data: existingInvite, error: existingInviteError } = await adminClient
+      .from('usuarios_sistema')
+      .select('id, empresa_id, auth_user_id')
+      .eq('email', email)
+      .maybeSingle();
+    if (existingInviteError) {
+      return new Response(JSON.stringify({ error: 'Could not verify existing organization invite.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (existingInvite && existingInvite.empresa_id !== membership.empresa_id) {
+      return new Response(JSON.stringify({ error: 'This email is already associated with another organization.' }), {
+        status: 409,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    let authUserId = matchedAuthUser?.id || null;
-    if (!authUserId) {
+    let matchedAuthUser = null;
+    for (let page = 1; page <= 100; page += 1) {
+      const { data: usersData, error: usersError } = await adminClient.auth.admin.listUsers({ page, perPage: 100 });
+      if (usersError) {
+        return new Response(JSON.stringify({ error: 'Could not verify the invited account.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      matchedAuthUser = usersData.users.find((item) => String(item.email || '').toLowerCase() === email) || null;
+      if (matchedAuthUser || usersData.users.length < 100) break;
+    }
+
+    let authUserId = matchedAuthUser?.id || existingInvite?.auth_user_id || null;
+    let existingMembership: { empresa_id: string; active: boolean } | null = null;
+    if (authUserId) {
+      const { data, error: existingMembershipError } = await adminClient
+        .from('tenant_memberships')
+        .select('empresa_id, active')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+      if (existingMembershipError) {
+        return new Response(JSON.stringify({ error: 'Could not verify existing account membership.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      existingMembership = data;
+      if (existingMembership && existingMembership.empresa_id !== membership.empresa_id) {
+        return new Response(JSON.stringify({ error: 'This account already belongs to another organization.' }), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    if (!authUserId && status !== 'bloqueado') {
       const inviteResult = await adminClient.auth.admin.inviteUserByEmail(email, {
         data: {
           nome,
-          empresa,
+          empresa: company.nome,
           perfil: perfilConvite,
         },
-        redirectTo: `${supabaseUrl.replace('https://', 'https://')}/auth/v1/callback`,
+        redirectTo: `${supabaseUrl.replace(/\/$/, '')}/auth/v1/callback`,
       });
 
       if (inviteResult.error) {
@@ -116,21 +214,123 @@ Deno.serve(async (req) => {
       authUserId = inviteResult.data?.user?.id || null;
     }
 
+    if (!authUserId) {
+      if (status === 'bloqueado' && existingInvite) {
+        const { data: row, error } = await adminClient
+          .from('usuarios_sistema')
+          .update({ status: 'bloqueado' })
+          .eq('id', existingInvite.id)
+          .eq('empresa_id', membership.empresa_id)
+          .select('id, equipe_id, auth_user_id, empresa_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
+          .single();
+        if (error) {
+          return new Response(JSON.stringify({ error: 'Could not block the pending invite.' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, row }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ error: 'Supabase did not return the invited account ID.' }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (status === 'bloqueado') {
+      if (existingMembership) {
+        const { error: blockMembershipError } = await adminClient
+          .from('tenant_memberships')
+          .update({ active: false })
+          .eq('user_id', authUserId)
+          .eq('empresa_id', membership.empresa_id);
+        if (blockMembershipError) {
+          return new Response(JSON.stringify({ error: 'Could not revoke the organization membership.' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    } else {
+      if (!existingMembership) {
+        const { error: insertMembershipError } = await adminClient
+          .from('tenant_memberships')
+          .insert({
+            user_id: authUserId,
+            empresa_id: membership.empresa_id,
+            role: invitedRole,
+            active: true,
+          });
+
+        if (insertMembershipError && insertMembershipError.code !== '23505') {
+          return new Response(JSON.stringify({ error: 'Could not assign the verified organization membership.' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      const { data: savedMembership, error: savedMembershipError } = await adminClient
+        .from('tenant_memberships')
+        .select('empresa_id')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+      if (savedMembershipError || savedMembership?.empresa_id !== membership.empresa_id) {
+        return new Response(JSON.stringify({ error: 'This account is already associated with another organization.' }), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error: updateMembershipError } = await adminClient
+        .from('tenant_memberships')
+        .update({ role: invitedRole, active: true })
+        .eq('user_id', authUserId)
+        .eq('empresa_id', membership.empresa_id);
+      if (updateMembershipError) {
+        return new Response(JSON.stringify({ error: 'Could not apply the organization role.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    if (status !== 'bloqueado') {
+      const { error: saveProfileError } = await adminClient
+        .from('profiles')
+        .upsert({
+          id: authUserId,
+          nome,
+          cargo: invitedRole,
+          empresa_id: membership.empresa_id,
+        }, { onConflict: 'id' });
+
+      if (saveProfileError) {
+        return new Response(JSON.stringify({ error: 'Could not save the invited account profile.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const { data: row, error } = await adminClient
       .from('usuarios_sistema')
       .upsert({
         equipe_id: equipeId,
         auth_user_id: authUserId,
+        empresa_id: membership.empresa_id,
         nome,
         email,
         perfil: perfilConvite,
         status,
-        senha_temporaria: senhaTemporaria,
         ultimo_acesso: null,
-        empresa,
+        empresa: company.nome,
         convites_enviados: 1,
       }, { onConflict: 'email' })
-      .select('id, equipe_id, auth_user_id, nome, email, perfil, status, senha_temporaria, ultimo_acesso, empresa, convites_enviados')
+      .select('id, equipe_id, auth_user_id, nome, email, perfil, status, ultimo_acesso, empresa, convites_enviados')
       .single();
 
     if (error) {

@@ -11,6 +11,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (event === 'PASSWORD_RECOVERY') {
       showResetPasswordForm();
     }
+    if (event === 'SIGNED_OUT') {
+      clearAuthScopedState();
+    }
   });
 
   if (isPasswordRecoveryFlow()) {
@@ -391,6 +394,14 @@ function isLocalHost() {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
 }
 
+function isProductionEnvironment() {
+  return !isLocalHost();
+}
+
+function getAppEnvironment() {
+  return isLocalHost() ? 'local' : 'production';
+}
+
 function setLocalAdminSession(active) {
   if (active) {
     sessionStorage.setItem('reisflow_admin_local', '1');
@@ -403,42 +414,59 @@ function isLocalAdminSession() {
   return sessionStorage.getItem('reisflow_admin_local') === '1';
 }
 
+function canUseLocalDebugMode() {
+  return isLocalHost();
+}
+
 async function abrirComPerfil(user) {
-  const email = user.email || '';
-  const permitidoPorEmail = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-
-  const { data: perfil } = await db
-    .from('profiles')
-    .select('nome, cargo, empresa_id')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  const cargoPerfil = String(perfil?.cargo || '').toLowerCase();
-  const cargoMetadata = String(user?.user_metadata?.cargo || user?.user_metadata?.role || '').toLowerCase();
-  const cargoDetectado = permitidoPorEmail ? 'admin' : (cargoPerfil || cargoMetadata || 'operador');
-  const cargo = typeof normalizeRole === 'function'
-    ? normalizeRole(cargoDetectado)
-    : cargoDetectado;
-  const nome = perfil?.nome || user.user_metadata?.nome || email;
-
-  if (!perfil) {
-    // Primeiro acesso: insere sem empresa_id (será vinculado pelo cadastro ou migração)
-    await db.from('profiles').insert({ id: user.id, nome, cargo });
-  } else if (perfil.cargo !== cargo || !perfil.nome) {
-    // Apenas atualiza nome/cargo — nunca sobrescreve empresa_id
-    await db.from('profiles').update({ nome, cargo }).eq('id', user.id);
+  if (!user?.id) {
+    showToast('A sessao autenticada nao identificou o usuario.', 'error');
+    clearAuthScopedState();
+    goToLogin();
+    return;
   }
 
-  // Armazena empresa_id na sessão para uso global
-  if (perfil?.empresa_id) {
-    sessionStorage.setItem('reisflow_empresa_id', perfil.empresa_id);
-  }
+  try {
+    const { data: empresaId, error: provisionError } = await db.rpc('provision_current_user_tenant');
+    if (provisionError) throw provisionError;
+    if (!empresaId) throw new Error('A conta ainda nao possui uma organizacao verificada.');
 
-  if (typeof syncUsuarioSistemaIdentityFromAuth === 'function') {
-    await syncUsuarioSistemaIdentityFromAuth();
-  }
+    const [{ data: perfil, error: profileError }, { data: cargoData, error: roleError }] = await Promise.all([
+      db.from('profiles').select('nome').eq('id', user.id).maybeSingle(),
+      db.rpc('app_user_role')
+    ]);
+    if (profileError) throw profileError;
+    if (roleError) throw roleError;
+    if (!perfil) throw new Error('O perfil autenticado nao foi provisionado.');
+    if (!cargoData) throw new Error('O papel do usuario nao possui uma membership ativa.');
 
-  goToApp(nome, cargo);
+    const cargo = typeof normalizeRole === 'function'
+      ? normalizeRole(cargoData)
+      : String(cargoData || 'operador').toLowerCase();
+    const nome = perfil.nome || user.user_metadata?.nome || user.email || 'Usuario';
+    const previousScope = window._reisActiveAuthScope;
+    const nextScope = `${user.id}:${empresaId}`;
+
+    if (previousScope && previousScope !== nextScope) {
+      clearTenantScopedMemory();
+    }
+
+    window.ReisFlowTenantStorage?.setAuthenticatedScope(user.id, empresaId);
+    window._reisActiveAuthScope = nextScope;
+    sessionStorage.setItem('reisflow_empresa_id', empresaId);
+
+    if (typeof syncUsuarioSistemaIdentityFromAuth === 'function') {
+      await syncUsuarioSistemaIdentityFromAuth();
+    }
+
+    goToApp(nome, cargo);
+  } catch (error) {
+    console.error('Falha ao validar o vinculo da organizacao autenticada.', error);
+    clearAuthScopedState();
+    await db.auth.signOut();
+    goToLogin();
+    showToast('A conta nao possui uma organizacao validada. O acesso foi bloqueado; contate o suporte.', 'error');
+  }
 }
 
 function getCurrentEmpresaId() {
@@ -522,8 +550,18 @@ async function loginUser() {
     return;
   }
 
-  if (isLocalHost() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada === ADMIN_PASSWORD) {
+  if (canUseLocalDebugMode() && email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && senhaNormalizada === ADMIN_PASSWORD) {
+    const { error: signOutError } = await db.auth.signOut();
+    if (signOutError) {
+      console.error('Falha ao encerrar a sessao Supabase antes do modo local.', signOutError);
+      showToast('Nao foi possivel isolar a sessao local da sessao Supabase.', 'error');
+      return;
+    }
+    clearAuthScopedState();
     setLocalAdminSession(true);
+    clearTenantScopedMemory();
+    window.ReisFlowTenantStorage?.setLocalDemoScope();
+    window._reisActiveAuthScope = 'local-demo';
     await playLoginLoader();
     goToApp('Administrador', 'admin');
     return;
@@ -618,30 +656,7 @@ async function registerUser() {
     return;
   }
 
-  // So cria empresa/perfil quando existe sessao ativa; sem sessao, o RLS bloqueia o insert.
   if (data.session?.access_token) {
-    // 1. Criar empresa
-    const { data: empresaData, error: empresaError } = await db
-      .from('empresas')
-      .insert({ nome: empresa, telefone: telefone || null })
-      .select('id')
-      .single();
-
-    if (empresaError || !empresaData?.id) {
-      showToast('Conta criada, mas erro ao configurar empresa. Tente entrar novamente.', 'warning');
-      return;
-    }
-
-    // 2. Criar perfil vinculado à empresa com cargo admin
-    const { error: profileError } = await db
-      .from('profiles')
-      .upsert({ id: data.user.id, nome, cargo: 'admin', empresa_id: empresaData.id });
-
-    if (profileError) {
-      showToast('Conta criada, mas houve erro ao criar perfil. Tente entrar novamente.', 'warning');
-      return;
-    }
-
     await abrirComPerfil(data.user);
     showToast('Conta criada com sucesso!', 'success');
     return;
@@ -738,11 +753,22 @@ async function updatePasswordUser() {
 // LOGOUT — chamado quando o usuário clica em "Sair"
 async function logoutUser() {
   setLocalAdminSession(false);
+  clearAuthScopedState();
+  const { error } = await db.auth.signOut();
+  if (error) {
+    console.error('Falha ao encerrar a sessao no Supabase.', error);
+    showToast('A sessao local foi limpa, mas o encerramento remoto falhou. Feche esta aba e tente novamente.', 'error');
+  }
+  goToLogin();
+}
+
+function clearAuthScopedState() {
+  window.ReisFlowTenantStorage?.clearActiveScope();
+  if (typeof clearTenantScopedMemory === 'function') clearTenantScopedMemory();
+  window._reisActiveAuthScope = null;
   sessionStorage.removeItem('reisflow_role');
   sessionStorage.removeItem('reisflow_user_name');
   sessionStorage.removeItem('reisflow_empresa_id');
-  await db.auth.signOut();
-  goToLogin();
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
