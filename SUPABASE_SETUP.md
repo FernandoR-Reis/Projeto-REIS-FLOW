@@ -24,7 +24,7 @@ Resultado esperado: tabelas criadas com sucesso.
 ## 3) Aplicar todas as migrations (antes de publicar ou conectar o front-end)
 
 1. Aplique, em ordem cronologica, todos os arquivos de `supabase/migrations/`.
-2. Confirme que a ultima migration aplicada e a mais recente deste diretorio. A publicacao de permissoes e personalizacao do Dashboard tambem exige `20261010000113_user_module_permissions.sql`, `20261014000114_dashboard_preferences.sql` e `20261014000115_fix_dashboard_preferences_save.sql`, nesta ordem.
+2. Confirme que a ultima migration aplicada e a mais recente deste diretorio. A publicacao de permissoes e personalizacao do Dashboard tambem exige `20261010000113_user_module_permissions.sql`, `20261014000114_dashboard_preferences.sql`, `20261014000115_fix_dashboard_preferences_save.sql` e `20261014000116_fix_permission_role_lookup.sql`, nesta ordem.
 3. Mantenha o aplicativo indisponivel ate a migration multi-tenant final concluir.
 
 Para publicar no projeto Supabase ja vinculado ao CLI, confira primeiro

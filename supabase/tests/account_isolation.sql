@@ -101,6 +101,7 @@ declare
   linked_users jsonb;
   grants_timestamp timestamptz;
   dashboard_preferences jsonb;
+  permission_data jsonb;
   rejected boolean;
   tenant_tables text[] := array[
     'clientes', 'obras', 'orcamentos', 'orcamento_itens',
@@ -169,6 +170,12 @@ declare
 begin
   if public.app_empresa_id() <> 'a2000000-0000-4000-8000-000000000001'::uuid then
     raise exception 'Account A did not resolve to its synthetic organization.';
+  end if;
+  permission_data := public.app_my_permissions();
+  if permission_data ->> 'role' <> 'admin'
+    or permission_data ->> 'is_admin' <> 'true'
+    or permission_data ->> 'empresa_id' <> 'a2000000-0000-4000-8000-000000000001' then
+    raise exception 'Admin permission RPC did not resolve the trusted membership role.';
   end if;
 
   foreach table_name in array tenant_tables loop
@@ -367,6 +374,7 @@ do $$
 declare
   finance_data jsonb;
   dashboard_preferences jsonb;
+  permission_data jsonb;
   rejected boolean := false;
 begin
   if public.app_user_role() <> 'financeiro'
@@ -375,6 +383,12 @@ begin
     or public.app_has_permission('obras', 'view')
     or public.app_has_permission('dashboard', 'view') then
     raise exception 'Finance role received permissions outside its least-privilege template.';
+  end if;
+  permission_data := public.app_my_permissions();
+  if permission_data ->> 'role' <> 'financeiro'
+    or permission_data ->> 'is_admin' <> 'false'
+    or permission_data -> 'permissions' -> 'financeiro' ->> 'view' <> 'true' then
+    raise exception 'Member permission RPC did not return its membership and grant data.';
   end if;
   if (select count(id) from public.financeiro_receber) <> 1
     or (select count(id) from public.clientes) <> 0

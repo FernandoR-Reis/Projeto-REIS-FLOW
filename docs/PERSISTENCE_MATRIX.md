@@ -84,12 +84,12 @@ Objetivo:
 - Preferencias de exibicao individuais ficam em `user_dashboard_preferences`, com escopo simultaneo de usuario e empresa; a migration `20261014000114_dashboard_preferences.sql` fornece leitura e gravacao por RPC e controle otimista de concorrencia
 - As preferencias controlam apenas a visibilidade dos nove cards e cinco secoes existentes (graficos, listas e tabela); a aplicacao filtra cada opcao pelas permissoes atuais e nao concede acesso a modulos
 - A ausencia de preferencias aplica o layout padrao atual sem gravar automaticamente. Se a leitura falhar, mantem-se a visualizacao padrao e o salvamento fica bloqueado ate uma nova tentativa; o modo de demonstracao usa o cache local ja isolado por sessao
-- Em 2026-10-14, as migrations 113, 114 e o hotfix 115 foram aplicados ao Supabase de producao; a Edge Function `invite-user` foi publicada. O frontend segue para GitHub Pages separadamente.
+- Em 2026-10-14, as migrations 113 a 116 foram aplicadas ao Supabase de producao; os hotfixes 115 e 116 corrigem validacoes do lint PostgreSQL. A Edge Function `invite-user` foi publicada.
 
 ## Limites de enforcement atual
 
 - Equipes, Estoque, Fornecedores e Cadastros Auxiliares continuam com partes em memoria/armazenamento local, conforme a matriz acima. A navegacao e as acoes da interface respeitam permissoes, mas a persistencia local desses dados ainda nao possui uma policy RLS de servidor; migrar esses registros para tabelas tenant-scoped sera necessario para enforcement remoto integral desses modulos.
-- As migrations `20261010000113_user_module_permissions.sql`, `20261014000114_dashboard_preferences.sql` e `20261014000115_fix_dashboard_preferences_save.sql` foram aplicadas ao Supabase de producao em 2026-10-14, antes do deploy do frontend. A Edge Function `invite-user` tambem foi publicada; a publicacao do site e uma etapa independente no GitHub Pages.
+- As migrations `20261010000113_user_module_permissions.sql` a `20261014000116_fix_permission_role_lookup.sql` foram aplicadas ao Supabase de producao em 2026-10-14, antes do deploy do frontend. Os hotfixes 115 e 116 corrigem os problemas identificados pelo lint remoto. A Edge Function `invite-user` tambem foi publicada.
 
 ---
 
