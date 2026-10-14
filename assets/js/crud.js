@@ -378,6 +378,7 @@ function inferirStatusFinanceiro(vencimentoIso, tipo) {
 async function salvarLancamentoFinanceiro() {
   const tipo = String(document.getElementById('fin-tipo')?.value || 'receber').toLowerCase();
   const editRef = String(document.getElementById('fin-edit-ref')?.value || '').trim();
+  if (!requireModulePermission('financeiro', editRef ? 'edit' : 'create', editRef ? 'editar lancamentos financeiros' : 'criar lancamentos financeiros')) return;
   const currentStatus = String(document.getElementById('fin-status-current')?.value || '').trim().toLowerCase();
   const descricao = String(document.getElementById('fin-descricao')?.value || '').trim();
   const valorRaw = String(document.getElementById('fin-valor')?.value || '').trim();
@@ -883,7 +884,7 @@ function adicionarClienteNoMapa(mapa, registro) {
   const telefone = String(registro.telefone || registro.tel || '').trim();
   const docKey = doc ? doc.replace(/\D/g, '') : '';
   const nomeKey = nome.toLowerCase();
-  const key = docKey || nomeKey;
+  const key = registro.id ? `id:${registro.id}` : docKey || nomeKey;
 
   if (mapa.has(key)) return;
 
@@ -1012,6 +1013,20 @@ function onObraOrcamentoChange() {
 
 async function obterClientesParaSelect() {
   const mapa = new Map();
+
+  if (!hasModulePermission('clientes') && (
+    hasModulePermission('obras')
+    || hasModulePermission('orcamentos')
+    || hasModulePermission('financeiro')
+  )) {
+    const { data, error } = await db.rpc('app_client_options');
+    if (error) throw error;
+    if (!Array.isArray(data)) throw new Error('O servidor retornou uma lista de clientes invalida.');
+    data.forEach((client) => adicionarClienteNoMapa(mapa, client));
+    const relatedModuleOptions = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    window._orcamentoClienteOptionsCache = relatedModuleOptions;
+    return relatedModuleOptions;
+  }
 
   try {
     const { data } = await db.from('clientes').select('id, nome, documento, telefone').order('nome');
@@ -1238,6 +1253,7 @@ function openQuickClienteFromOrcamento() {
 }
 
 async function salvarClienteRapidoOrcamento() {
+  if (!requireModulePermission('clientes', 'create', 'cadastrar clientes')) return;
   const nome = document.getElementById('orc-cli-nome')?.value?.trim() || '';
   const tel = document.getElementById('orc-cli-tel')?.value?.trim() || '';
   const tipoSelecionado = document.getElementById('orc-cli-tipo')?.value || '';
@@ -1537,6 +1553,7 @@ window.openModal = function(id) {
 // -------------------------------------------------------------
 async function salvarObra() {
   const obraEditId    = document.getElementById('obra-edit-id')?.value?.trim() || '';
+  if (!requireModulePermission('obras', obraEditId ? 'edit' : 'create', obraEditId ? 'editar obras' : 'criar obras')) return;
   const obraClientId  = document.getElementById('obra-edit-client-id')?.value?.trim() || '';
   const nome          = document.getElementById('obra-nome').value.trim();
   const orcamentoRaw  = document.getElementById('obra-orcamento-id').value;
@@ -1677,6 +1694,7 @@ async function salvarObra() {
 // -------------------------------------------------------------
 async function salvarOrcamento() {
   const orcamentoEditId = document.getElementById('orc-edit-id')?.value?.trim() || '';
+  if (!requireModulePermission('orcamentos', orcamentoEditId ? 'edit' : 'create', orcamentoEditId ? 'editar orcamentos' : 'criar orcamentos')) return;
   const clienteRaw = document.getElementById('orc-cliente-id')?.value || '';
   const clienteSearch = document.getElementById('orc-cliente-search')?.value?.trim() || '';
   const clienteMode = document.getElementById('orc-cliente-mode')?.value || 'selected';
@@ -1848,6 +1866,7 @@ async function salvarCliente() {
   const email = document.getElementById('cli-email').value.trim();
   const editDoc = document.getElementById('cli-edit-doc')?.value?.trim() || '';
   const isEditMode = !!editDoc;
+  if (!requireModulePermission('clientes', isEditMode ? 'edit' : 'create', isEditMode ? 'editar clientes' : 'criar clientes')) return;
 
   if (!nome) { showToast('Informe o nome do cliente', 'warning'); return; }
   if (!doc)  { showToast('Informe o CPF ou CNPJ', 'warning'); return; }
@@ -1981,6 +2000,7 @@ async function salvarCliente() {
 }
 
 async function toggleClienteStatus(source = 'edit') {
+  if (!requireModulePermission('clientes', 'edit', 'alterar clientes')) return;
   const isDetailMode = String(source || '').toLowerCase() === 'detail';
   const editDoc = isDetailMode
     ? document.getElementById('cliente-detail-doc-value')?.value?.trim() || ''
@@ -2069,6 +2089,7 @@ async function toggleClienteStatus(source = 'edit') {
 }
 
 async function toggleOrcamentoStatus() {
+  if (!requireModulePermission('orcamentos', 'edit', 'alterar orcamentos')) return;
   const orcamentoId = document.getElementById('orc-detail-id')?.value?.trim() || '';
   const statusInput = document.getElementById('orc-detail-status-value');
   const toggleBtn = document.getElementById('btn-toggle-orc-status');

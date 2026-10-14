@@ -29,7 +29,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const authHeader = req.headers.get('Authorization') || '';
     const userClient = createClient(supabaseUrl, anonKey || serviceRoleKey, {
@@ -60,8 +59,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!['admin', 'gestor'].includes(String(membership.role || '').toLowerCase())) {
-      return new Response(JSON.stringify({ error: 'Forbidden.' }), {
+    if (String(membership.role || '').toLowerCase() !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Only an organization admin may invite users or change access.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -104,6 +103,12 @@ Deno.serve(async (req) => {
     if (!invitedRole) {
       return new Response(JSON.stringify({ error: 'Invalid organization role.' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (invitedRole === 'admin') {
+      return new Response(JSON.stringify({ error: 'Administrator privileges are assigned only by the trusted organization bootstrap.' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -172,11 +177,11 @@ Deno.serve(async (req) => {
     }
 
     let authUserId = matchedAuthUser?.id || existingInvite?.auth_user_id || null;
-    let existingMembership: { empresa_id: string; active: boolean } | null = null;
+    let existingMembership: { empresa_id: string; active: boolean; role: string } | null = null;
     if (authUserId) {
       const { data, error: existingMembershipError } = await adminClient
         .from('tenant_memberships')
-        .select('empresa_id, active')
+        .select('empresa_id, active, role')
         .eq('user_id', authUserId)
         .maybeSingle();
       if (existingMembershipError) {
@@ -189,6 +194,12 @@ Deno.serve(async (req) => {
       if (existingMembership && existingMembership.empresa_id !== membership.empresa_id) {
         return new Response(JSON.stringify({ error: 'This account already belongs to another organization.' }), {
           status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      if (existingMembership?.role === 'admin') {
+        return new Response(JSON.stringify({ error: 'Administrator memberships cannot be changed through the invite flow.' }), {
+          status: 403,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

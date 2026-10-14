@@ -95,6 +95,18 @@
       }
     }
 
+    function removeItem(logicalKey) {
+      const key = keyFor(logicalKey);
+      if (!key) return false;
+      try {
+        storage.removeItem(key);
+        return true;
+      } catch (error) {
+        console.warn('Nao foi possivel remover o cache local da sessao.', error);
+        return false;
+      }
+    }
+
     function removeLegacyData() {
       try {
         LEGACY_DATA_KEYS.forEach((key) => storage.removeItem(key));
@@ -115,6 +127,7 @@
       setLocalDemoScope,
       getItem,
       setItem,
+      removeItem,
       removeLegacyData,
       clearActiveScope
     };

@@ -15,12 +15,12 @@ const orcPreviewItems = [
 const ROLE_ACCESS = {
   admin: {
     label: 'Administrador',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'cadastros', 'configuracoes'],
     modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-lancamento', 'modal-novo-membro', 'modal-permissoes-equipe', 'modal-nova-entrada', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
   },
   gestor: {
     label: 'Gestor',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'cadastros', 'configuracoes'],
     modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-lancamento', 'modal-novo-membro', 'modal-permissoes-equipe', 'modal-nova-entrada', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-equipe-detalhe']
   },
   financeiro: {
@@ -35,7 +35,7 @@ const ROLE_ACCESS = {
   },
   operador: {
     label: 'Operador',
-    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'configuracoes'],
+    views: ['dashboard', 'obras', 'orcamentos', 'clientes', 'financeiro', 'equipes', 'estoque', 'fornecedores', 'cadastros', 'configuracoes'],
     modals: ['modal-nova-obra', 'modal-novo-orc', 'modal-orc-detalhe', 'modal-novo-cliente', 'modal-orc-cliente-rapido', 'modal-cliente-detalhe', 'modal-etapas-obra', 'modal-historico-obra', 'modal-lancamento', 'modal-novo-item-estoque', 'modal-editar-item-estoque', 'modal-novo-fornecedor', 'modal-equipe-detalhe']
   },
   visualizador: {
@@ -66,20 +66,98 @@ function setCurrentUserContext(nome, cargo) {
   sessionStorage.setItem('reisflow_role', normalizeRole(cargo));
 }
 
+const PERMISSION_VIEW_MODULES = {
+  dashboard: 'dashboard',
+  obras: 'obras',
+  orcamentos: 'orcamentos',
+  clientes: 'clientes',
+  financeiro: 'financeiro',
+  equipes: 'equipes',
+  estoque: 'estoque',
+  fornecedores: 'fornecedores',
+  cadastros: 'cadastros',
+  configuracoes: 'configuracoes'
+};
+const PERMISSION_TEMPLATE_LABELS = {
+  gerente: 'Gerente',
+  operacional: 'Operacional',
+  financeiro: 'Financeiro',
+  tecnico: 'Técnico',
+  visualizador: 'Visualizador',
+  personalizado: 'Personalizado',
+  administrador: 'Administrador'
+};
+
+const MODAL_PERMISSION_REQUIREMENTS = {
+  'modal-nova-obra': ['obras', 'create'],
+  'modal-novo-orc': ['orcamentos', 'create'],
+  'modal-orc-detalhe': ['orcamentos', 'view'],
+  'modal-novo-cliente': ['clientes', 'create'],
+  'modal-orc-cliente-rapido': ['clientes', 'create'],
+  'modal-lancamento': ['financeiro', 'create'],
+  'modal-novo-membro': ['equipes', 'create'],
+  'modal-permissoes-equipe': ['usuarios', 'admin'],
+  'modal-user-permissions-editor': ['usuarios', 'admin'],
+  'modal-nova-entrada': ['estoque', 'create'],
+  'modal-novo-item-estoque': ['estoque', 'create'],
+  'modal-editar-item-estoque': ['estoque', 'edit'],
+  'modal-novo-fornecedor': ['fornecedores', 'create'],
+  'modal-cliente-detalhe': ['clientes', 'view'],
+  'modal-etapas-obra': ['obras', 'edit'],
+  'modal-historico-obra': ['obras', 'view'],
+  'modal-equipe-detalhe': ['equipes', 'view']
+};
+
+function hasModulePermission(moduleName, action = 'view') {
+  if (window._reisActiveAuthScope === 'local-demo' || window._currentPermissions?.is_admin === true) return true;
+  if (window._currentPermissionsLoaded !== true) return false;
+  return window._currentPermissions?.permissions?.[moduleName]?.[action] === true;
+}
+
+function requireModulePermission(moduleName, action, label = 'esta operacao') {
+  if (hasModulePermission(moduleName, action)) return true;
+  showToast(`Voce nao tem permissao para ${label}.`, 'warning');
+  return false;
+}
+
+async function refreshCurrentUserPermissions() {
+  if (window._reisActiveAuthScope === 'local-demo') {
+    window._currentPermissions = { is_admin: true, permissions: {} };
+    window._currentPermissionsLoaded = true;
+    return window._currentPermissions;
+  }
+
+  const { data, error } = await db.rpc('app_my_permissions');
+  if (error) throw error;
+  if (!data?.user_id || !data?.empresa_id || !data?.permissions || typeof data.permissions !== 'object') {
+    throw new Error('O servidor nao retornou um conjunto valido de permissoes.');
+  }
+
+  window._currentPermissions = data;
+  window._currentPermissionsLoaded = true;
+  return data;
+}
+
 function canAccessView(view) {
-  const role = getCurrentRole();
-  return ROLE_ACCESS[role].views.includes(view);
+  const moduleName = PERMISSION_VIEW_MODULES[view];
+  return Boolean(moduleName && hasModulePermission(moduleName, 'view'));
 }
 
 function canAccessModal(id) {
-  const role = getCurrentRole();
-  return ROLE_ACCESS[role].modals.includes(id);
+  const requirement = MODAL_PERMISSION_REQUIREMENTS[id];
+  if (!requirement) return false;
+  let [moduleName, action] = requirement;
+  if (id === 'modal-novo-membro' && window._openingEditMemberModal === true) action = 'edit';
+  if (id === 'modal-lancamento' && window._openingEditFinanceModal === true) action = 'edit';
+  if (id === 'modal-novo-fornecedor' && window._openingEditSupplierModal === true) action = 'edit';
+  if (id === 'modal-nova-obra' && document.getElementById('obra-edit-id')?.value) action = 'edit';
+  if (id === 'modal-novo-orc' && document.getElementById('orc-edit-id')?.value) action = 'edit';
+  return hasModulePermission(moduleName, action);
 }
 
 function applyRolePermissions() {
   const role = getCurrentRole();
   const access = ROLE_ACCESS[role];
-  const allowedViews = new Set(access.views);
 
   document.querySelectorAll('.nav-item').forEach((item) => {
     const handler = item.getAttribute('onclick') || '';
@@ -87,11 +165,13 @@ function applyRolePermissions() {
     if (!match) return;
 
     const view = match[1];
-    item.style.display = allowedViews.has(view) ? '' : 'none';
+    item.style.display = canAccessView(view) ? '' : 'none';
   });
 
   document.querySelectorAll('.user-role').forEach((el) => {
-    el.textContent = access.label;
+    el.textContent = window._currentPermissions?.is_admin
+      ? 'Administrador'
+      : PERMISSION_TEMPLATE_LABELS[window._currentPermissions?.template_key] || access.label;
   });
 
   const userCardName = document.querySelector('.user-card .user-name');
@@ -120,17 +200,30 @@ function applyRolePermissions() {
       return;
     }
 
+    if (handler.includes('openPermissoesEquipeModal')) {
+      button.style.display = hasModulePermission('usuarios', 'admin') ? '' : 'none';
+      return;
+    }
+    if (handler.includes('toggleContextConfigEditor') || handler.includes('saveSystemConfigFromEditor') || handler.includes('resetSystemConfigToDefaults')) {
+      button.style.display = hasModulePermission('cadastros', 'admin') ? '' : 'none';
+      return;
+    }
+
     if (modalMatch) {
       button.style.display = canAccessModal(modalMatch[1]) ? '' : 'none';
     }
   });
 
+  document.querySelectorAll('[data-permission-module]').forEach((element) => {
+    const moduleName = element.getAttribute('data-permission-module');
+    const action = element.getAttribute('data-permission-action') || 'view';
+    element.style.display = hasModulePermission(moduleName, action) ? '' : 'none';
+  });
 }
 
 function applyObraDetailAccess() {
-  const role = getCurrentRole();
-  const canSeeFinance = ['admin', 'gestor', 'financeiro'].includes(role);
-  const canSeeOps = ['admin', 'gestor', 'tecnico', 'operador'].includes(role);
+  const canSeeFinance = hasModulePermission('financeiro', 'view');
+  const canSeeOps = hasModulePermission('obras', 'view');
 
   const cards = document.querySelectorAll('#view-obra-detail .card');
   cards.forEach((card) => {
@@ -149,10 +242,10 @@ function applyObraDetailAccess() {
   document.querySelectorAll('#view-obra-detail .detail-header .btn').forEach((button) => {
     const text = button.textContent.trim().toLowerCase();
     if (text.includes('editar')) {
-      button.style.display = canSeeOps ? '' : 'none';
+      button.style.display = hasModulePermission('obras', 'edit') ? '' : 'none';
     }
     if (text.includes('relatório')) {
-      button.style.display = ['admin', 'gestor'].includes(role) ? '' : 'none';
+      button.style.display = hasModulePermission('obras', 'view') ? '' : 'none';
     }
   });
 }
@@ -1206,6 +1299,7 @@ function navigate(view, element) {
     equipes:'Equipes',
     estoque:'Estoque',
     fornecedores:'Fornecedores',
+    cadastros:'Cadastros Auxiliares',
     configuracoes:'Configurações'
   };
 
@@ -1224,7 +1318,7 @@ function navigate(view, element) {
   if (view === 'equipes') populateEquipes();
   if (view === 'estoque') populateEstoque();
   if (view === 'fornecedores' && typeof populateFornecedores === 'function') populateFornecedores();
-  if (view === 'configuracoes' && typeof renderSystemConfigEditor === 'function') renderSystemConfigEditor();
+  if (view === 'cadastros' && typeof renderSystemConfigEditor === 'function') renderSystemConfigEditor();
 
   if (window.innerWidth <= 900 && typeof closeSidebar === 'function') closeSidebar();
 }
@@ -1772,14 +1866,16 @@ async function loadAllData() {
   window._reisPrimaryDataState = 'loading';
   window._reisPrimaryDataError = '';
   try {
-    const [resObras, resOrc, resOrcItens, resCli, resFinRec, resFinPag] = await Promise.all([
-      db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }),
-      db.from('orcamentos').select('*, clientes(nome), cliente_nome_avulso').order('created_at', { ascending: false }),
-      db.from('orcamento_itens').select('orcamento_id, quantidade, valor_unitario'),
-      db.from('clientes').select('*').order('created_at', { ascending: false }),
-      db.from('financeiro_receber').select('referencia, cliente_id, obra_id, descricao, valor, vencimento, status, paid_at, clientes(nome), obras(codigo)').order('vencimento', { ascending: true }),
-      db.from('financeiro_pagar').select('referencia, fornecedor, categoria, valor, vencimento, status, paid_at').order('vencimento', { ascending: true })
+    const emptyResult = { data: [], error: null };
+    const [resObras, resOrc, resOrcItens, resCli, resFinance] = await Promise.all([
+      hasModulePermission('obras') ? db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }) : emptyResult,
+      hasModulePermission('orcamentos') ? db.from('orcamentos').select('*, clientes(nome), cliente_nome_avulso').order('created_at', { ascending: false }) : emptyResult,
+      hasModulePermission('orcamentos') ? db.from('orcamento_itens').select('orcamento_id, quantidade, valor_unitario') : emptyResult,
+      hasModulePermission('clientes') ? db.from('clientes').select('*').order('created_at', { ascending: false }) : emptyResult,
+      hasModulePermission('financeiro') ? db.rpc('app_finance_data') : { data: { receivables: [], payables: [] }, error: null }
     ]);
+    const resFinRec = { data: resFinance?.data?.receivables, error: resFinance?.error };
+    const resFinPag = { data: resFinance?.data?.payables, error: resFinance?.error };
 
     const queryErrors = [
       resObras?.error,
@@ -1792,6 +1888,12 @@ async function loadAllData() {
 
     if (queryErrors.length > 0) {
       throw queryErrors[0];
+    }
+    if (hasModulePermission('financeiro') && (
+      !Array.isArray(resFinance?.data?.receivables)
+      || !Array.isArray(resFinance?.data?.payables)
+    )) {
+      throw new Error('O servidor retornou dados financeiros invalidos.');
     }
 
     // Sobrescreve os arrays do sistema com dados reais

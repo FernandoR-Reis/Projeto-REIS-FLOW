@@ -24,8 +24,13 @@ Resultado esperado: tabelas criadas com sucesso.
 ## 3) Aplicar todas as migrations (antes de publicar ou conectar o front-end)
 
 1. Aplique, em ordem cronologica, todos os arquivos de `supabase/migrations/`.
-2. Confirme que a ultima migration aplicada e `20261009000112_account_isolation_hardening.sql`.
+2. Confirme que a ultima migration aplicada e a mais recente deste diretorio. A publicacao de permissoes e personalizacao do Dashboard tambem exige `20261010000113_user_module_permissions.sql` e `20261014000114_dashboard_preferences.sql`, nesta ordem.
 3. Mantenha o aplicativo indisponivel ate a migration multi-tenant final concluir.
+
+Para publicar no projeto Supabase ja vinculado ao CLI, confira primeiro
+`supabase migration list --linked` e `supabase db push --linked --dry-run`.
+Revise as migrations pendentes e entao aplique-as com
+`supabase db push --linked`.
 
 O `schema.sql` e somente a estrutura-base e bloqueia o acesso autenticado ate as
 migrations de isolamento serem instaladas. Nao publique chaves nem libere login
@@ -65,14 +70,16 @@ Nao use registros de producao para reproduzir ou testar o isolamento.
 3. Publique a funcao com:
 
 ```bash
-supabase functions deploy invite-user
+supabase functions deploy invite-user --use-api
 ```
 
 Resultado esperado: o fluxo de convite passa a chamar a funcao e enviar o e-mail pelo Supabase.
 
-Convites e bloqueios devem passar por `invite-user`, que valida a associacao da
-equipe e do administrador no mesmo tenant. Nao grave `empresa_id`, papel de
-autorizacao ou senha temporaria diretamente pelo navegador.
+Publique a funcao depois das migrations e antes de liberar o frontend que utiliza
+o fluxo de convites/permissoes. Convites e bloqueios devem passar por
+`invite-user`, que valida a associacao da equipe e exige administrador ativo no
+mesmo tenant. Nao grave `empresa_id`, papel de autorizacao ou senha temporaria
+diretamente pelo navegador.
 
 ## 6) Validar no dominio provisório
 

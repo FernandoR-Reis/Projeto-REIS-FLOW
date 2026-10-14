@@ -459,7 +459,7 @@ async function abrirComPerfil(user) {
       await syncUsuarioSistemaIdentityFromAuth();
     }
 
-    goToApp(nome, cargo);
+    await goToApp(nome, cargo);
   } catch (error) {
     console.error('Falha ao validar o vinculo da organizacao autenticada.', error);
     clearAuthScopedState();
@@ -563,7 +563,7 @@ async function loginUser() {
     window.ReisFlowTenantStorage?.setLocalDemoScope();
     window._reisActiveAuthScope = 'local-demo';
     await playLoginLoader();
-    goToApp('Administrador', 'admin');
+    await goToApp('Administrador', 'admin');
     return;
   }
 
@@ -763,6 +763,12 @@ async function logoutUser() {
 }
 
 function clearAuthScopedState() {
+  if (window._permissionRefreshTimer) {
+    clearInterval(window._permissionRefreshTimer);
+    window._permissionRefreshTimer = null;
+  }
+  window._currentPermissions = null;
+  window._currentPermissionsLoaded = false;
   window.ReisFlowTenantStorage?.clearActiveScope();
   if (typeof clearTenantScopedMemory === 'function') clearTenantScopedMemory();
   window._reisActiveAuthScope = null;

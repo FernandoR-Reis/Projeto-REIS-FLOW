@@ -110,6 +110,28 @@ const PERFIS_PADRAO_USUARIO = [
   'Visualizador'
 ];
 
+const PERMISSION_MODULE_DEFINITIONS = [
+  { key: 'dashboard', label: 'Dashboard', actions: ['view'] },
+  { key: 'obras', label: 'Obras', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'orcamentos', label: 'Orçamentos', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'clientes', label: 'Clientes', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'financeiro', label: 'Financeiro', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'equipes', label: 'Equipes', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'estoque', label: 'Estoque', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'fornecedores', label: 'Fornecedores', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'configuracoes', label: 'Configurações', actions: ['view', 'admin'] },
+  { key: 'cadastros', label: 'Cadastros Auxiliares', actions: ['view', 'admin'] },
+  { key: 'usuarios', label: 'Usuários e Permissões', actions: ['view', 'admin'], adminOnly: true }
+];
+
+const PERMISSION_ACTION_LABELS = {
+  view: 'Visualizar',
+  create: 'Criar',
+  edit: 'Editar',
+  delete: 'Excluir',
+  admin: 'Administrar'
+};
+
 const usuariosSistemaData = [];
 
 const SYSTEM_CONFIG_STORAGE_KEY = 'reisflow_system_config';
@@ -118,6 +140,13 @@ const DEFAULT_SYSTEM_CONFIG = {
   supplierCategories: ['Elétrica', 'Hidráulica', 'Civil', 'Ferramentas', 'EPI', 'Geral'],
   stockCategories: ['Elétrica', 'Hidráulica', 'Civil', 'Ferramentas', 'EPI', 'Outros'],
   launchCategories: ['Serviços', 'Material', 'Mão de obra', 'Administrativo'],
+  teamAreaLabels: {
+    obras: 'Obras',
+    eletrica: 'Elétrica',
+    hidraulica: 'Hidráulica',
+    civil: 'Civil',
+    administrativo: 'Administrativo'
+  },
   teamRolesByArea: {
     obras: ['Mestre de Obras', 'Pedreiro', 'Ajudante'],
     eletrica: ['Eletricista', 'Eletricista Senior', 'Técnico'],
@@ -130,12 +159,33 @@ const DEFAULT_SYSTEM_CONFIG = {
 window._systemConfig = window._systemConfig || null;
 
 function normalizeSystemConfigList(values, fallback) {
-  const list = Array.isArray(values) ? values : String(values || '')
+  if (Array.isArray(values)) return uniqueSystemConfigValues(values);
+  const list = String(values || '')
     .split(/[\n,;]+/)
     .map((item) => String(item || '').trim())
     .filter(Boolean);
   const normalized = list.length > 0 ? list : Array.isArray(fallback) ? fallback : [];
-  return Array.from(new Set(normalized));
+  return uniqueSystemConfigValues(normalized);
+}
+
+function uniqueSystemConfigValues(values) {
+  const seen = new Set();
+  return (Array.isArray(values) ? values : [])
+    .map((item) => String(item || '').trim())
+    .filter((item) => {
+      const key = normalizeSystemConfigText(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function normalizeSystemConfigText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 function cloneDefaultSystemConfig() {
@@ -143,6 +193,7 @@ function cloneDefaultSystemConfig() {
     supplierCategories: [...DEFAULT_SYSTEM_CONFIG.supplierCategories],
     stockCategories: [...DEFAULT_SYSTEM_CONFIG.stockCategories],
     launchCategories: [...DEFAULT_SYSTEM_CONFIG.launchCategories],
+    teamAreaLabels: { ...DEFAULT_SYSTEM_CONFIG.teamAreaLabels },
     teamRolesByArea: Object.fromEntries(
       Object.entries(DEFAULT_SYSTEM_CONFIG.teamRolesByArea).map(([area, roles]) => [area, [...roles]])
     )
@@ -206,44 +257,7 @@ async function syncUsuarioSistemaIdentityFromAuth() {
   if (!authUserId || !window.db?.from) return false;
 
   try {
-    const [{ data: perfil, error: profileError }, { data: cargoData, error: roleError }, { data: sessionData, error: sessionError }] = await Promise.all([
-      db.from('profiles')
-      .select('id, nome, cargo')
-      .eq('id', authUserId)
-      .maybeSingle(),
-      db.rpc('app_user_role'),
-      db.auth.getSession()
-    ]);
-    if (profileError) throw profileError;
-    if (roleError) throw roleError;
-    if (sessionError) throw sessionError;
-    const sessionUser = sessionData?.session?.user;
-    const email = String(sessionUser?.email || '').trim();
-    const nome = String(perfil?.nome || email || 'Usuário').trim();
-    const cargo = normalizeRole(cargoData || 'operador');
-    const equipe = (Array.isArray(equipeData) ? equipeData : []).find((member) => {
-      const memberEmail = String(member?.email || '').trim().toLowerCase();
-      const memberName = String(member?.name || member?.nome || '').trim().toLowerCase();
-      const normalizedEmail = email.toLowerCase();
-      return (normalizedEmail && memberEmail === normalizedEmail) || (nome && memberName === nome.toLowerCase());
-    });
-
-    const payload = {
-      auth_user_id: authUserId,
-      equipe_id: equipe?.id || null,
-      nome,
-      email: email || null,
-      perfil: cargo === 'admin' ? 'Administrador' : cargo === 'gestor' ? 'Gerente' : cargo === 'financeiro' ? 'Financeiro' : 'Visualizador',
-      status: 'ativo',
-      empresa: String(sessionUser?.user_metadata?.empresa || '').trim(),
-      ultimo_acesso: new Date().toISOString(),
-      convites_enviados: 0
-    };
-
-    const { error } = await db
-      .from('usuarios_sistema')
-      .upsert(payload, { onConflict: 'auth_user_id' });
-
+    const { error } = await db.rpc('app_touch_current_user_access');
     if (error) throw error;
     return true;
   } catch (error) {
@@ -535,6 +549,50 @@ function getPermissaoAcessoByEquipeId(equipeId) {
   return (Array.isArray(usuariosSistemaData) ? usuariosSistemaData : []).find((row) => String(row.equipeId || '') === id) || null;
 }
 
+async function refreshCompanyPermissionUsers() {
+  if (!hasModulePermission('usuarios', 'admin')) {
+    throw new Error('Somente o administrador da organizacao pode gerenciar permissoes.');
+  }
+  if (window._reisActiveAuthScope === 'local-demo') {
+    loadUsuariosSistemaFromStorage();
+    return usuariosSistemaData;
+  }
+
+  const { data, error } = await db.rpc('app_company_users');
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error('O servidor retornou uma lista de usuarios invalida.');
+
+  usuariosSistemaData.length = 0;
+  data.forEach((item, index) => {
+    const role = String(item.role || '');
+    const perfil = item.perfil || ({
+      admin: 'Administrador',
+      gestor: 'Gerente',
+      financeiro: 'Financeiro',
+      tecnico: 'Obras',
+      operador: 'Comercial',
+      visualizador: 'Visualizador'
+    })[role] || 'Visualizador';
+    usuariosSistemaData.push({
+      ...normalizeUsuarioSistema({
+        ...item,
+        id: item.user_id,
+        auth_user_id: item.user_id,
+        equipe_id: item.equipe_id,
+        perfil,
+        status: item.status
+      }, index),
+      role,
+      active: item.active === true,
+      templateKey: String(item.template_key || 'personalizado'),
+      permissionsUpdatedAt: item.permissions_updated_at || null,
+      permissions: item.permissions && typeof item.permissions === 'object' ? item.permissions : null,
+      isAdmin: role === 'admin'
+    });
+  });
+  return usuariosSistemaData;
+}
+
 async function salvarAcessoUsuarioViaConvite(member, perfil, status) {
   if (!window.db?.functions?.invoke) {
     throw new Error('O servico de convite nao esta disponivel.');
@@ -571,12 +629,10 @@ function getPermissaoPerfilByEquipeId(equipeId) {
 
 function getPermissoesEquipeFilteredList() {
   const search = normalizeUsuarioSistemaText(window._permissoesEquipeFilters?.search || '');
-  return (Array.isArray(equipeData) ? equipeData : []).filter((member) => {
+  return (Array.isArray(usuariosSistemaData) ? usuariosSistemaData : []).filter((user) => {
     if (!search) return true;
-    const acesso = getPermissaoAcessoByEquipeId(member.id);
-    const status = String(acesso?.status || 'sem acesso');
-    const perfil = String(acesso?.perfil || 'sem acesso');
-    const corpus = `${member.name} ${member.role} ${member.area} ${status} ${perfil}`;
+    const member = (Array.isArray(equipeData) ? equipeData : []).find((item) => String(item.id || '') === String(user.equipeId || ''));
+    const corpus = `${user.nome} ${member?.role || ''} ${member ? getEquipeAreaLabel(member.area) : ''} ${user.status} ${user.perfil} ${user.email}`;
     return normalizeUsuarioSistemaText(corpus).includes(search);
   });
 }
@@ -584,12 +640,9 @@ function getPermissoesEquipeFilteredList() {
 function updatePermissoesEquipeSummary() {
   const el = document.getElementById('eq-permissoes-summary');
   if (!el) return;
-  const total = (Array.isArray(equipeData) ? equipeData : []).length;
-  const ativos = (Array.isArray(equipeData) ? equipeData : []).filter((member) => {
-    const acesso = getPermissaoAcessoByEquipeId(member.id);
-    return String(acesso?.status || '').toLowerCase() === 'ativo';
-  }).length;
-  el.textContent = `${total} colaboradores · ${ativos} com acesso ativo`;
+  const total = usuariosSistemaData.length;
+  const ativos = usuariosSistemaData.filter((item) => item.active && item.status === 'ativo').length;
+  el.textContent = `${total} usuarios vinculados · ${ativos} com acesso ativo`;
 }
 
 function populatePermissoesEquipeModal() {
@@ -598,26 +651,35 @@ function populatePermissoesEquipeModal() {
 
   const list = getPermissoesEquipeFilteredList();
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Nenhum colaborador encontrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Nenhum usuario vinculado encontrado.</td></tr>';
     updatePermissoesEquipeSummary();
     return;
   }
 
-  tbody.innerHTML = list.map((member) => {
-    const idSafe = String(member.id || '').replace(/'/g, '&#39;');
-    const acesso = getPermissaoAcessoByEquipeId(member.id);
-    const perfil = acesso?.perfil || '—';
+  tbody.innerHTML = list.map((user) => {
+    const idSafe = String(user.authUserId || '').replace(/'/g, '&#39;');
+    const member = (Array.isArray(equipeData) ? equipeData : []).find((item) => String(item.id || '') === String(user.equipeId || ''));
+    const perfil = user.isAdmin
+      ? 'Administrador'
+      : (PERMISSION_TEMPLATE_LABELS[user.templateKey] || user.perfil || 'Personalizado');
+    const statusBadge = !user.active
+      ? '<span class="badge badge-neutral">Bloqueado</span>'
+      : user.status === 'convite_pendente'
+        ? '<span class="badge badge-warning">Convite pendente</span>'
+        : '<span class="badge badge-success">Ativo</span>';
+    const action = user.isAdmin
+      ? '<span class="muted">Protegido</span>'
+      : user.authUserId
+        ? `<button class="btn btn-ghost btn-xs" onclick="openEditarPermissaoEquipe('${idSafe}')" title="Editar permissões"><i class="ti ti-adjustments"></i></button>`
+        : '<span class="muted">Sem conta</span>';
     return `<tr>
-      <td><div class="bold">${member.name}</div></td>
-      <td class="muted">${member.role || '—'}</td>
-      <td class="muted">${getEquipeAreaLabel(member.area)}</td>
-      <td><span class="badge badge-neutral">${perfil}</span></td>
-      <td>${getPermissaoStatusBadgeByEquipeId(member.id)}</td>
+      <td><div class="bold">${escapeHtml(user.nome)}</div><div class="muted">${escapeHtml(user.email)}</div></td>
+      <td class="muted">${escapeHtml(member?.role || '—')}</td>
+      <td class="muted">${escapeHtml(member ? getEquipeAreaLabel(member.area) : '—')}</td>
+      <td><span class="badge badge-neutral">${escapeHtml(perfil)}</span></td>
+      <td>${statusBadge}</td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-xs" onclick="openEditarPermissaoEquipe('${idSafe}')"><i class="ti ti-edit"></i></button>
-          <button class="btn btn-ghost btn-xs" onclick="togglePermissaoEquipeStatus('${idSafe}')"><i class="ti ti-lock"></i></button>
-        </div>
+        ${action}
       </td>
     </tr>`;
   }).join('');
@@ -632,27 +694,161 @@ function onPermissoesEquipeFiltersChange() {
   populatePermissoesEquipeModal();
 }
 
-function openPermissoesEquipeModal() {
+async function openPermissoesEquipeModal() {
   openModal('modal-permissoes-equipe');
-  populatePermissoesEquipeModal();
+  const tbody = document.getElementById('eq-permissoes-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Carregando usuarios...</td></tr>';
+  try {
+    await refreshCompanyPermissionUsers();
+    populatePermissoesEquipeModal();
+  } catch (error) {
+    console.error('Falha ao carregar usuarios e permissoes da organizacao.', error);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center">Nao foi possivel carregar os usuarios.</td></tr>';
+    showToast(`Nao foi possivel carregar os usuarios: ${error?.message || 'erro desconhecido'}`, 'error');
+  }
 }
 
 function openNovoMembroFromPermissoes() {
-  openModal('modal-novo-membro');
   resetNovoMembroModal();
+  openModal('modal-novo-membro');
 }
 
 function openEditarPermissaoEquipe(memberId) {
-  openEditarMembroEquipe(memberId);
+  const user = usuariosSistemaData.find((item) => String(item.authUserId || '') === String(memberId || ''));
+  if (!user || user.isAdmin) {
+    showToast('As permissoes administrativas nao podem ser alteradas por esta tela.', 'warning');
+    return;
+  }
+  window._editingPermissionUserId = user.authUserId;
+  window._editingPermissionUpdatedAt = user.permissionsUpdatedAt;
+  document.getElementById('permission-user-name').textContent = user.nome;
+  document.getElementById('permission-user-email').textContent = user.email;
+  document.getElementById('permission-template').value = user.templateKey || 'personalizado';
+  renderUserPermissionMatrix(user.permissions || {});
+  openModal('modal-user-permissions-editor');
+}
+
+function getPermissionTemplate(templateKey) {
+  const definitions = Object.fromEntries(PERMISSION_MODULE_DEFINITIONS.map(({ key }) => [
+    key,
+    { view: false, create: false, edit: false, delete: false, admin: false }
+  ]));
+  const enable = (moduleNames, actions) => moduleNames.forEach((moduleName) => {
+    actions.forEach((action) => { definitions[moduleName][action] = true; });
+  });
+  const coreModules = ['obras', 'orcamentos', 'clientes', 'equipes', 'estoque', 'fornecedores'];
+
+  if (templateKey === 'gerente') {
+    enable(coreModules, ['view', 'create', 'edit', 'delete']);
+    enable(['configuracoes', 'cadastros'], ['view']);
+  } else if (templateKey === 'operacional') {
+    enable(coreModules, ['view', 'create', 'edit']);
+    enable(['configuracoes', 'cadastros'], ['view']);
+  } else if (templateKey === 'financeiro') {
+    enable(['financeiro'], ['view', 'create', 'edit']);
+  } else if (templateKey === 'tecnico') {
+    enable(['obras'], ['view', 'edit']);
+    enable(['equipes'], ['view']);
+    enable(['estoque', 'fornecedores'], ['view', 'create', 'edit']);
+  } else if (templateKey === 'visualizador') {
+    enable(coreModules, ['view']);
+  }
+  return definitions;
+}
+
+function renderUserPermissionMatrix(permissions) {
+  const container = document.getElementById('permission-matrix');
+  if (!container) return;
+  container.innerHTML = PERMISSION_MODULE_DEFINITIONS.map((module) => `
+    <section class="permission-module-card">
+      <h4>${escapeHtml(module.label)}</h4>
+      ${module.adminOnly ? '<p class="muted">Acesso reservado ao administrador da organizacao.</p>' : ''}
+      <div class="permission-actions">
+        ${module.actions.map((action) => {
+          const checked = permissions?.[module.key]?.[action] === true;
+          const disabled = Boolean(module.adminOnly);
+          const id = `permission-${module.key}-${action}`;
+          return `<label for="${id}" class="permission-action">
+            <input id="${id}" type="checkbox" data-permission-module-key="${module.key}" data-permission-action-key="${action}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+            <span>${PERMISSION_ACTION_LABELS[action]}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    </section>
+  `).join('');
+}
+
+function onPermissionTemplateChange(templateKey) {
+  const template = String(templateKey || 'personalizado');
+  if (template !== 'personalizado') {
+    renderUserPermissionMatrix(getPermissionTemplate(template));
+    return;
+  }
+}
+
+function onPermissionMatrixChange(event) {
+  if (event.target?.matches('[data-permission-module-key]')) {
+    const selector = document.getElementById('permission-template');
+    if (selector) selector.value = 'personalizado';
+  }
+}
+
+async function saveUserPermissions() {
+  const targetUserId = String(window._editingPermissionUserId || '').trim();
+  if (!targetUserId) {
+    showToast('Selecione um usuario antes de salvar permissoes.', 'warning');
+    return;
+  }
+  const templateKey = String(document.getElementById('permission-template')?.value || 'personalizado');
+  const permissions = getPermissionTemplate('personalizado');
+  document.querySelectorAll('#permission-matrix [data-permission-module-key]').forEach((input) => {
+    const moduleName = input.getAttribute('data-permission-module-key');
+    const actionName = input.getAttribute('data-permission-action-key');
+    if (permissions[moduleName] && Object.hasOwn(permissions[moduleName], actionName)) {
+      permissions[moduleName][actionName] = input.checked;
+    }
+  });
+  if (!Object.values(permissions).some((module) => module.view)) {
+    showToast('Conceda acesso de visualizacao a pelo menos um modulo.', 'warning');
+    return;
+  }
+
+  const button = document.getElementById('permission-save-btn');
+  if (button) button.disabled = true;
+  try {
+    const { data, error } = await db.rpc('app_save_user_permissions', {
+      target_user_id: targetUserId,
+      requested_permissions: permissions,
+      requested_template: templateKey,
+      expected_updated_at: window._editingPermissionUpdatedAt
+    });
+    if (error) throw error;
+    const user = usuariosSistemaData.find((item) => String(item.authUserId || '') === targetUserId);
+    if (user) {
+      user.permissions = data?.permissions;
+      user.templateKey = templateKey;
+      user.permissionsUpdatedAt = data?.updated_at || user.permissionsUpdatedAt;
+    }
+    closeModal('modal-user-permissions-editor');
+    populatePermissoesEquipeModal();
+    showToast('Permissoes salvas com sucesso.', 'success');
+  } catch (error) {
+    console.error('Falha ao salvar permissoes do usuario.', error);
+    showToast(`Nao foi possivel salvar as permissoes: ${error?.message || 'erro desconhecido'}`, 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function togglePermissaoEquipeStatus(memberId) {
-  const member = (Array.isArray(equipeData) ? equipeData : []).find((item) => String(item.id || '') === String(memberId || ''));
-  if (!member) return;
-
-  const acesso = getPermissaoAcessoByEquipeId(member.id);
-  if (!acesso) {
-    showToast('Colaborador sem acesso cadastrado.', 'info');
+  const acesso = usuariosSistemaData.find((item) => String(item.authUserId || '') === String(memberId || ''));
+  const member = equipeData.find((item) => String(item.id || '') === String(acesso?.equipeId || ''));
+  if (!member || !acesso) {
+    showToast('A conta nao possui um vinculo confirmado com um membro da equipe.', 'warning');
+    return;
+  }
+  if (acesso.isAdmin) {
+    showToast('A membership de administrador nao pode ser bloqueada por este fluxo.', 'warning');
     return;
   }
 
@@ -675,10 +871,8 @@ async function togglePermissaoEquipeStatus(memberId) {
   }
 
   try {
-    const updated = await salvarAcessoUsuarioViaConvite(member, acesso.perfil, nextStatus);
-    const idx = usuariosSistemaData.findIndex((row) => String(row.id || '') === String(acesso.id || ''));
-    if (idx >= 0) usuariosSistemaData[idx] = updated;
-    saveUsuariosSistemaToStorage();
+    await salvarAcessoUsuarioViaConvite(member, acesso.perfil, nextStatus);
+    await refreshCompanyPermissionUsers();
     populatePermissoesEquipeModal();
     showToast(nextStatus === 'bloqueado' ? 'Acesso bloqueado.' : 'Acesso liberado.', 'success');
   } catch (error) {
@@ -714,25 +908,25 @@ function loadUsuariosSistemaIntoUI() {
 }
 
 async function refreshUsuariosSistemaData() {
-  const hasSession = await hasSupabaseSession();
-  if (hasSession) {
-    const synced = await syncUsuariosSistemaFromSupabase({ silent: true });
-    if (!synced) loadUsuariosSistemaFromStorage();
-  } else {
-    loadUsuariosSistemaFromStorage();
-  }
+  usuariosSistemaData.length = 0;
+  if (window._reisActiveAuthScope === 'local-demo') loadUsuariosSistemaFromStorage();
 }
 
 function loadSystemConfig() {
   if (window._systemConfig) return window._systemConfig;
 
   let parsed = null;
+  let raw = null;
+  let parseFailed = false;
   try {
-    const raw = window.ReisFlowTenantStorage?.getItem(SYSTEM_CONFIG_STORAGE_KEY);
+    raw = window.ReisFlowTenantStorage?.getItem(SYSTEM_CONFIG_STORAGE_KEY) || null;
     parsed = raw ? JSON.parse(raw) : null;
   } catch {
     parsed = null;
+    parseFailed = true;
   }
+  window._systemConfigStorageSnapshot = raw;
+  window._systemConfigStorageInvalid = parseFailed;
 
   const config = cloneDefaultSystemConfig();
   if (parsed && typeof parsed === 'object') {
@@ -740,8 +934,15 @@ function loadSystemConfig() {
     config.stockCategories = normalizeSystemConfigList(parsed.stockCategories, config.stockCategories);
     config.launchCategories = normalizeSystemConfigList(parsed.launchCategories, config.launchCategories);
     const teamRoles = parsed.teamRolesByArea && typeof parsed.teamRolesByArea === 'object' ? parsed.teamRolesByArea : {};
+    const teamAreaLabels = parsed.teamAreaLabels && typeof parsed.teamAreaLabels === 'object' ? parsed.teamAreaLabels : {};
+    Object.keys(teamRoles).forEach((area) => {
+      if (/^[a-z0-9_]+$/.test(area)) config.teamRolesByArea[area] = uniqueSystemConfigValues(teamRoles[area]);
+    });
     Object.keys(config.teamRolesByArea).forEach((area) => {
-      config.teamRolesByArea[area] = normalizeSystemConfigList(teamRoles[area], config.teamRolesByArea[area]);
+      if (!Object.prototype.hasOwnProperty.call(teamRoles, area)) {
+        config.teamRolesByArea[area] = [...DEFAULT_SYSTEM_CONFIG.teamRolesByArea[area]];
+      }
+      config.teamAreaLabels[area] = String(teamAreaLabels[area] || config.teamAreaLabels[area] || area).trim();
     });
   }
 
@@ -754,27 +955,48 @@ function getSystemConfig() {
 }
 
 function saveSystemConfig(config) {
-  const next = {
-    supplierCategories: normalizeSystemConfigList(config?.supplierCategories, DEFAULT_SYSTEM_CONFIG.supplierCategories),
-    stockCategories: normalizeSystemConfigList(config?.stockCategories, DEFAULT_SYSTEM_CONFIG.stockCategories),
-    launchCategories: normalizeSystemConfigList(config?.launchCategories, DEFAULT_SYSTEM_CONFIG.launchCategories),
-    teamRolesByArea: {}
-  };
-
-  Object.keys(DEFAULT_SYSTEM_CONFIG.teamRolesByArea).forEach((area) => {
-    next.teamRolesByArea[area] = normalizeSystemConfigList(
-      config?.teamRolesByArea?.[area],
-      DEFAULT_SYSTEM_CONFIG.teamRolesByArea[area]
-    );
-  });
-
-  window._systemConfig = next;
-  try {
-    window.ReisFlowTenantStorage?.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Falha silenciosa: a UI continua usando a versão em memória.
+  if (typeof hasModulePermission === 'function' && !hasModulePermission('cadastros', 'admin')) {
+    throw new Error('Voce nao tem permissao para administrar cadastros auxiliares.');
+  }
+  if (window._systemConfigStorageInvalid) {
+    throw new Error('Os cadastros salvos estão inválidos; os dados atuais foram preservados e precisam ser revisados.');
+  }
+  const currentStoredValue = window.ReisFlowTenantStorage?.getItem(SYSTEM_CONFIG_STORAGE_KEY) || null;
+  if (currentStoredValue !== window._systemConfigStorageSnapshot) {
+    throw new Error('Os cadastros auxiliares foram alterados em outra sessão. Atualize a página antes de tentar novamente.');
   }
 
+  const sourceRoles = config?.teamRolesByArea && typeof config.teamRolesByArea === 'object'
+    ? config.teamRolesByArea
+    : {};
+  const teamRolesByArea = {};
+  Object.entries(sourceRoles).forEach(([area, roles]) => {
+    if (/^[a-z0-9_]+$/.test(area)) teamRolesByArea[area] = uniqueSystemConfigValues(roles);
+  });
+
+  const sourceLabels = config?.teamAreaLabels && typeof config.teamAreaLabels === 'object'
+    ? config.teamAreaLabels
+    : {};
+  const teamAreaLabels = {};
+  Object.keys(teamRolesByArea).forEach((area) => {
+    teamAreaLabels[area] = String(sourceLabels[area] || area).trim();
+  });
+
+  const next = {
+    supplierCategories: uniqueSystemConfigValues(config?.supplierCategories),
+    stockCategories: uniqueSystemConfigValues(config?.stockCategories),
+    launchCategories: uniqueSystemConfigValues(config?.launchCategories),
+    teamAreaLabels,
+    teamRolesByArea
+  };
+
+  const serialized = JSON.stringify(next);
+  if (!window.ReisFlowTenantStorage?.setItem(SYSTEM_CONFIG_STORAGE_KEY, serialized)) {
+    throw new Error('Não foi possível persistir os cadastros auxiliares no armazenamento da conta ativa.');
+  }
+
+  window._systemConfigStorageSnapshot = serialized;
+  window._systemConfig = next;
   return next;
 }
 
@@ -803,64 +1025,464 @@ function getConfiguredTeamRolesByArea() {
   return getSystemConfig().teamRolesByArea;
 }
 
-function renderConfigTextareaValue(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.value = Array.isArray(value) ? value.join('\n') : String(value || '');
+function getSystemConfigItems(kind, area = '') {
+  const config = getSystemConfig();
+  if (kind === 'teamAreas') {
+    return Object.keys(config.teamRolesByArea).map((key) => ({ key, label: config.teamAreaLabels[key] || key }));
+  }
+  if (kind === 'teamRoles') return config.teamRolesByArea[area] || [];
+  return config[kind] || [];
+}
+
+function createConfigListRow(label, onRename, onDelete) {
+  const row = document.createElement('div');
+  row.className = 'config-item-row';
+  const name = document.createElement('span');
+  name.className = 'config-item-name';
+  name.textContent = label;
+  row.appendChild(name);
+
+  const actions = document.createElement('div');
+  actions.className = 'config-item-actions';
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn-ghost btn-xs';
+  editButton.title = 'Editar';
+  editButton.setAttribute('aria-label', `Editar ${label}`);
+  editButton.innerHTML = '<i class="ti ti-edit"></i>';
+  editButton.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 60;
+    input.value = label;
+    input.className = 'config-item-edit-input';
+    name.replaceWith(input);
+    actions.replaceChildren();
+
+    const saveButton = document.createElement('button');
+    saveButton.type = 'button';
+    saveButton.className = 'btn btn-primary btn-xs';
+    saveButton.textContent = 'Salvar';
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'btn btn-ghost btn-xs';
+    cancelButton.textContent = 'Cancelar';
+    saveButton.addEventListener('click', () => onRename(input.value));
+    cancelButton.addEventListener('click', renderSystemConfigEditor);
+    actions.append(saveButton, cancelButton);
+    input.focus();
+    input.select();
+  });
+
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'btn btn-ghost btn-xs config-item-delete';
+  deleteButton.title = 'Excluir';
+  deleteButton.setAttribute('aria-label', `Excluir ${label}`);
+  deleteButton.innerHTML = '<i class="ti ti-trash"></i>';
+  deleteButton.addEventListener('click', onDelete);
+  actions.append(editButton, deleteButton);
+  actions.style.display = hasModulePermission('cadastros', 'admin') ? '' : 'none';
+  row.appendChild(actions);
+  return row;
+}
+
+function renderConfigItemGroup(container, kind, area = '') {
+  if (!container) return;
+  const items = getSystemConfigItems(kind, area);
+  container.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'config-list-empty';
+    empty.textContent = kind === 'teamRoles' ? 'Nenhuma função cadastrada nesta área.' : 'Nenhum item cadastrado.';
+    container.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const key = kind === 'teamAreas' ? item.key : item;
+    const label = kind === 'teamAreas' ? item.label : item;
+    container.appendChild(createConfigListRow(
+      label,
+      (nextLabel) => renameConfigItem(kind, key, nextLabel, area),
+      () => deleteConfigItem(kind, key, area)
+    ));
+  });
 }
 
 function renderSystemConfigEditor() {
-  const config = getSystemConfig();
-  renderConfigTextareaValue('cfg-supplier-categories', config.supplierCategories);
-  renderConfigTextareaValue('cfg-stock-categories', config.stockCategories);
-  renderConfigTextareaValue('cfg-launch-categories', config.launchCategories);
-  renderConfigTextareaValue('cfg-team-roles-obras', config.teamRolesByArea.obras);
-  renderConfigTextareaValue('cfg-team-roles-eletrica', config.teamRolesByArea.eletrica);
-  renderConfigTextareaValue('cfg-team-roles-hidraulica', config.teamRolesByArea.hidraulica);
-  renderConfigTextareaValue('cfg-team-roles-civil', config.teamRolesByArea.civil);
-  renderConfigTextareaValue('cfg-team-roles-administrativo', config.teamRolesByArea.administrativo);
+  const canManage = hasModulePermission('cadastros', 'admin');
+  renderConfigItemGroup(document.getElementById('cfg-supplier-categories-list'), 'supplierCategories');
+  renderConfigItemGroup(document.getElementById('cfg-stock-categories-list'), 'stockCategories');
+  renderConfigItemGroup(document.getElementById('cfg-launch-categories-list'), 'launchCategories');
+  renderConfigItemGroup(document.getElementById('cfg-team-areas-list'), 'teamAreas');
+
+  const rolesContainer = document.getElementById('cfg-team-roles-list');
+  if (!rolesContainer) return;
+  rolesContainer.replaceChildren();
+  Object.keys(getConfiguredTeamRolesByArea()).forEach((area) => {
+    const group = document.createElement('section');
+    group.className = 'config-team-role-group';
+    group.dataset.area = area;
+    const header = document.createElement('div');
+    header.className = 'config-team-role-header';
+    const title = document.createElement('strong');
+    title.textContent = getEquipeAreaLabel(area);
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'btn btn-secondary btn-xs';
+    addButton.textContent = '+ Adicionar função';
+    addButton.style.display = canManage ? '' : 'none';
+    addButton.addEventListener('click', () => openConfigItemEditor('teamRoles', area));
+    header.append(title, addButton);
+    const list = document.createElement('div');
+    list.className = 'config-item-list';
+    list.id = `cfg-team-roles-${area}-list`;
+    renderConfigItemGroup(list, 'teamRoles', area);
+    group.append(header, list);
+    rolesContainer.appendChild(group);
+  });
 }
 
 function saveSystemConfigFromEditor() {
-  const next = {
-    supplierCategories: normalizeSystemConfigList(document.getElementById('cfg-supplier-categories')?.value, DEFAULT_SYSTEM_CONFIG.supplierCategories),
-    stockCategories: normalizeSystemConfigList(document.getElementById('cfg-stock-categories')?.value, DEFAULT_SYSTEM_CONFIG.stockCategories),
-    launchCategories: normalizeSystemConfigList(document.getElementById('cfg-launch-categories')?.value, DEFAULT_SYSTEM_CONFIG.launchCategories),
-    teamRolesByArea: {
-      obras: normalizeSystemConfigList(document.getElementById('cfg-team-roles-obras')?.value, DEFAULT_SYSTEM_CONFIG.teamRolesByArea.obras),
-      eletrica: normalizeSystemConfigList(document.getElementById('cfg-team-roles-eletrica')?.value, DEFAULT_SYSTEM_CONFIG.teamRolesByArea.eletrica),
-      hidraulica: normalizeSystemConfigList(document.getElementById('cfg-team-roles-hidraulica')?.value, DEFAULT_SYSTEM_CONFIG.teamRolesByArea.hidraulica),
-      civil: normalizeSystemConfigList(document.getElementById('cfg-team-roles-civil')?.value, DEFAULT_SYSTEM_CONFIG.teamRolesByArea.civil),
-      administrativo: normalizeSystemConfigList(document.getElementById('cfg-team-roles-administrativo')?.value, DEFAULT_SYSTEM_CONFIG.teamRolesByArea.administrativo)
-    }
-  };
-
-  saveSystemConfig(next);
-  refreshConfigDrivenSelects();
-  renderSystemConfigEditor();
-  showToast('Cadastros auxiliares atualizados com sucesso!', 'success');
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return;
+  }
+  try {
+    saveSystemConfig(getSystemConfig());
+    showToast('Cadastros auxiliares salvos com sucesso!', 'success');
+  } catch (error) {
+    showToast(`Não foi possível salvar os cadastros auxiliares: ${error.message}`, 'error');
+  }
 }
 
 function resetSystemConfigToDefaults() {
-  saveSystemConfig(cloneDefaultSystemConfig());
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return;
+  }
+  const current = getSystemConfig();
+  const defaults = cloneDefaultSystemConfig();
+  const next = {
+    ...defaults,
+    supplierCategories: uniqueSystemConfigValues([...defaults.supplierCategories, ...current.supplierCategories]),
+    stockCategories: uniqueSystemConfigValues([...defaults.stockCategories, ...current.stockCategories]),
+    launchCategories: uniqueSystemConfigValues([...defaults.launchCategories, ...current.launchCategories]),
+    teamAreaLabels: { ...current.teamAreaLabels, ...defaults.teamAreaLabels },
+    teamRolesByArea: Object.fromEntries(
+      Object.keys({ ...current.teamRolesByArea, ...defaults.teamRolesByArea }).map((area) => [
+        area,
+        uniqueSystemConfigValues([
+          ...(defaults.teamRolesByArea[area] || []),
+          ...(current.teamRolesByArea[area] || [])
+        ])
+      ])
+    )
+  };
+  try {
+    saveSystemConfig(next);
+  } catch (error) {
+    showToast(`Não foi possível restaurar os cadastros: ${error.message}`, 'error');
+    return;
+  }
   refreshConfigDrivenSelects();
   renderSystemConfigEditor();
-  showToast('Cadastros auxiliares restaurados ao padrão.', 'info');
+  showToast('Padrões restaurados. Itens personalizados foram mantidos para preservar os dados.', 'info');
+}
+
+function cloneSystemConfig(config = getSystemConfig()) {
+  return {
+    supplierCategories: [...config.supplierCategories],
+    stockCategories: [...config.stockCategories],
+    launchCategories: [...config.launchCategories],
+    teamAreaLabels: { ...config.teamAreaLabels },
+    teamRolesByArea: Object.fromEntries(
+      Object.entries(config.teamRolesByArea).map(([area, roles]) => [area, [...roles]])
+    )
+  };
+}
+
+function openConfigItemEditor(kind, area = '') {
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return;
+  }
+  let containerId = {
+    supplierCategories: 'cfg-supplier-categories-list',
+    stockCategories: 'cfg-stock-categories-list',
+    launchCategories: 'cfg-launch-categories-list',
+    teamAreas: 'cfg-team-areas-list'
+  }[kind];
+  if (kind === 'teamRoles') {
+    const groups = document.querySelectorAll('.config-team-role-group');
+    const target = Array.from(groups).find((group) => group.dataset.area === area);
+    containerId = target?.querySelector('.config-item-list')?.id || '';
+  }
+  const container = containerId ? document.getElementById(containerId) : null;
+  if (!container || container.querySelector('.config-item-new')) return;
+
+  const form = document.createElement('div');
+  form.className = 'config-item-new';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.maxLength = 60;
+  input.placeholder = kind === 'teamAreas' ? 'Nome da área' : kind === 'teamRoles' ? 'Nome da função' : 'Nome da categoria';
+  input.setAttribute('aria-label', input.placeholder);
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'btn btn-primary btn-xs';
+  save.textContent = 'Salvar';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-ghost btn-xs';
+  cancel.textContent = 'Cancelar';
+  const submit = () => {
+    const created = addConfigItem(kind, input.value, area);
+    if (created) renderSystemConfigEditor();
+  };
+  save.addEventListener('click', submit);
+  cancel.addEventListener('click', renderSystemConfigEditor);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') submit();
+    if (event.key === 'Escape') renderSystemConfigEditor();
+  });
+  form.append(input, save, cancel);
+  container.appendChild(form);
+  input.focus();
+}
+
+function isConfigItemInUse(kind, value, area = '') {
+  const key = normalizeSystemConfigText(value);
+  if (kind === 'supplierCategories') {
+    const categoryKey = slugifyCategoryLabel(value);
+    return (Array.isArray(fornecedoresData) ? fornecedoresData : []).some((item) => slugifyCategoryLabel(item?.categoria) === categoryKey);
+  }
+  if (kind === 'stockCategories') {
+    return (Array.isArray(estoqueData) ? estoqueData : []).some((item) => normalizeSystemConfigText(item?.cat) === key);
+  }
+  if (kind === 'launchCategories') {
+    return [...(Array.isArray(financRec) ? financRec : []), ...(Array.isArray(financPag) ? financPag : [])]
+      .some((item) => normalizeSystemConfigText(item?.cat || item?.categoria) === key);
+  }
+  if (kind === 'teamRoles') {
+    return (Array.isArray(equipeData) ? equipeData : []).some((item) => (
+      String(item?.area || '').toLowerCase() === area && normalizeSystemConfigText(item?.role) === key
+    ));
+  }
+  if (kind === 'teamAreas') {
+    return (Array.isArray(equipeData) ? equipeData : []).some((item) => String(item?.area || '').toLowerCase() === value);
+  }
+  return false;
+}
+
+function persistConfigMutation(next, successMessage) {
+  try {
+    saveSystemConfig(next);
+    refreshConfigDrivenSelects();
+    renderSystemConfigEditor();
+    if (successMessage) showToast(successMessage, 'success');
+    return true;
+  } catch (error) {
+    showToast(`Não foi possível salvar o cadastro: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+function addConfigItem(kind, value, area = '') {
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return false;
+  }
+  const label = String(value || '').trim();
+  if (!label) {
+    showToast('Informe um nome antes de salvar.', 'warning');
+    return null;
+  }
+  if (label.length > 60) {
+    showToast('Use no máximo 60 caracteres.', 'warning');
+    return null;
+  }
+
+  const next = cloneSystemConfig();
+  if (kind === 'teamAreas') {
+    const areaKey = slugifyCategoryLabel(label);
+    const duplicate = Object.values(next.teamAreaLabels).some((existing) => normalizeSystemConfigText(existing) === normalizeSystemConfigText(label));
+    if (!areaKey || duplicate || next.teamRolesByArea[areaKey]) {
+      showToast('Já existe uma área com esse nome ou o nome não pode ser usado.', 'warning');
+      return null;
+    }
+    next.teamAreaLabels[areaKey] = label;
+    next.teamRolesByArea[areaKey] = [];
+    if (!persistConfigMutation(next, 'Área cadastrada com sucesso!')) return null;
+    return areaKey;
+  }
+
+  if (kind === 'supplierCategories') {
+    const categoryKey = slugifyCategoryLabel(label);
+    if (!categoryKey || next.supplierCategories.some((item) => slugifyCategoryLabel(item) === categoryKey)) {
+      showToast('Já existe uma categoria com esse nome ou identificador.', 'warning');
+      return null;
+    }
+  }
+
+  if (kind === 'teamRoles' && !next.teamRolesByArea[area]) {
+    showToast('A área selecionada não está disponível.', 'error');
+    return null;
+  }
+  const list = kind === 'teamRoles' ? next.teamRolesByArea[area] : next[kind];
+  if (!Array.isArray(list)) {
+    showToast('Não foi possível identificar a lista que será atualizada.', 'error');
+    return null;
+  }
+  if (list.some((item) => normalizeSystemConfigText(item) === normalizeSystemConfigText(label))) {
+    showToast('Já existe um item com esse nome.', 'warning');
+    return null;
+  }
+  list.push(label);
+  return persistConfigMutation(next, 'Cadastro realizado com sucesso!') ? label : null;
+}
+
+function renameConfigItem(kind, currentValue, value, area = '') {
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return false;
+  }
+  const label = String(value || '').trim();
+  if (!label) {
+    showToast('O nome não pode ficar vazio.', 'warning');
+    return;
+  }
+  if (label.length > 60) {
+    showToast('Use no máximo 60 caracteres.', 'warning');
+    return;
+  }
+  if (kind !== 'teamAreas' && isConfigItemInUse(kind, currentValue, area)) {
+    showToast('Este item já está vinculado a registros e não pode ser renomeado.', 'warning');
+    return;
+  }
+
+  const next = cloneSystemConfig();
+  if (kind === 'teamAreas') {
+    if (Object.entries(next.teamAreaLabels).some(([key, existing]) => key !== currentValue && normalizeSystemConfigText(existing) === normalizeSystemConfigText(label))) {
+      showToast('Já existe uma área com esse nome.', 'warning');
+      return;
+    }
+    next.teamAreaLabels[currentValue] = label;
+  } else {
+    if (kind === 'supplierCategories') {
+      const categoryKey = slugifyCategoryLabel(label);
+      if (!categoryKey || next.supplierCategories.some((item) => (
+        slugifyCategoryLabel(item) === categoryKey
+        && normalizeSystemConfigText(item) !== normalizeSystemConfigText(currentValue)
+      ))) {
+        showToast('Já existe uma categoria com esse nome ou identificador.', 'warning');
+        return;
+      }
+    }
+    const list = kind === 'teamRoles' ? next.teamRolesByArea[area] : next[kind];
+    if (!Array.isArray(list)) return;
+    if (list.some((item) => normalizeSystemConfigText(item) === normalizeSystemConfigText(label) && normalizeSystemConfigText(item) !== normalizeSystemConfigText(currentValue))) {
+      showToast('Já existe um item com esse nome.', 'warning');
+      return;
+    }
+    const index = list.findIndex((item) => normalizeSystemConfigText(item) === normalizeSystemConfigText(currentValue));
+    if (index < 0) return;
+    list[index] = label;
+  }
+  persistConfigMutation(next, 'Cadastro atualizado com sucesso.');
+}
+
+function deleteConfigItem(kind, value, area = '') {
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para administrar cadastros auxiliares.', 'warning');
+    return false;
+  }
+  if (kind === 'teamAreas' && (getSystemConfig().teamRolesByArea[value] || []).length > 0) {
+    showToast('Remova primeiro as funções desta área. Isso preserva a organização dos cadastros.', 'warning');
+    return;
+  }
+  if (isConfigItemInUse(kind, value, area)) {
+    showToast('Este item está em uso por registros existentes e não pode ser excluído.', 'warning');
+    return;
+  }
+  if (!window.confirm('Excluir este cadastro auxiliar?')) return;
+  const next = cloneSystemConfig();
+  if (kind === 'teamAreas') {
+    delete next.teamAreaLabels[value];
+    delete next.teamRolesByArea[value];
+  } else {
+    const list = kind === 'teamRoles' ? next.teamRolesByArea[area] : next[kind];
+    const index = Array.isArray(list) ? list.findIndex((item) => normalizeSystemConfigText(item) === normalizeSystemConfigText(value)) : -1;
+    if (index < 0) return;
+    list.splice(index, 1);
+  }
+  persistConfigMutation(next, 'Cadastro excluído com sucesso.');
+}
+
+function toggleContextConfigEditor(kind, context, forceOpen) {
+  if (!hasModulePermission('cadastros', 'admin')) {
+    showToast('Voce nao tem permissao para criar cadastros auxiliares.', 'warning');
+    return;
+  }
+  const panel = document.getElementById(`context-config-${kind}-${context}`);
+  const input = document.getElementById(`context-config-input-${kind}-${context}`);
+  if (!panel) return;
+  const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.hidden;
+  panel.hidden = !shouldOpen;
+  if (shouldOpen && input) {
+    input.value = '';
+    input.focus();
+  }
+}
+
+function createConfigItemFromContext(kind, context) {
+  const input = document.getElementById(`context-config-input-${kind}-${context}`);
+  const label = String(input?.value || '').trim();
+  const area = kind === 'teamRoles' ? String(document.getElementById('eq-area')?.value || '') : '';
+  const created = addConfigItem(kind, label, area);
+  if (!created) return;
+
+  const selectIds = {
+    supplierCategories: 'forn-categoria',
+    stockCategories: context === 'stockEdit' ? 'est-edit-categoria' : 'est-item-categoria',
+    launchCategories: 'fin-categoria',
+    teamAreas: 'eq-area',
+    teamRoles: 'eq-funcao'
+  };
+  const select = document.getElementById(selectIds[kind]);
+  if (select) select.value = String(created);
+  if (kind === 'teamAreas') onEquipeAreaChange(String(created));
+  toggleContextConfigEditor(kind, context, false);
+}
+
+function renderConfigTeamAreaSelects() {
+  const config = getSystemConfig();
+  const areas = Object.keys(config.teamRolesByArea).map((key) => ({ value: key, label: config.teamAreaLabels[key] || key }));
+  renderSelectOptions(document.getElementById('eq-area'), areas, null);
+  renderSelectOptions(document.getElementById('equipes-filter-area'), [{ value: 'todos', label: 'Todas as áreas' }, ...areas], null);
 }
 
 function renderSelectOptions(select, options, placeholder) {
   if (!select) return;
   const currentValue = select.value;
-  select.innerHTML = '';
+  select.replaceChildren();
   if (placeholder) {
-    select.innerHTML += `<option value="">${placeholder}</option>`;
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = placeholder;
+    select.appendChild(placeholderOption);
   }
   options.forEach((item) => {
-    const value = String(item?.value || item?.label || '').trim();
+    const value = String(item?.value ?? item?.label ?? '').trim();
     const label = String(item?.label || item?.value || '').trim();
     if (!value && !label) return;
-    select.innerHTML += `<option value="${String(value).replace(/"/g, '&quot;')}">${label}</option>`;
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
   });
-  if (currentValue && Array.from(select.options).some((option) => option.value === currentValue)) {
+  if (Array.from(select.options).some((option) => option.value === currentValue)) {
     select.value = currentValue;
   }
 }
@@ -876,21 +1498,23 @@ function refreshConfigDrivenSelects() {
   renderSelectOptions(document.getElementById('est-item-categoria'), [{ value: '', label: 'Selecione' }, ...stockOptions], null);
   renderSelectOptions(document.getElementById('est-edit-categoria'), stockOptions, null);
   renderSelectOptions(document.getElementById('fin-categoria'), launchOptions, null);
+  renderConfigTeamAreaSelects();
 
   const configRoles = getConfiguredTeamRolesByArea();
   const currentArea = document.getElementById('eq-area')?.value || 'obras';
-  const roles = configRoles[currentArea] || configRoles.obras || [];
+  const roles = configRoles[currentArea] || [];
   const roleSelect = document.getElementById('eq-funcao');
   const selectedRole = roleSelect?.value || '';
   if (roleSelect) {
     renderSelectOptions(roleSelect, roles.map((role) => ({ value: role, label: role })), null);
-    if (selectedRole && roles.includes(selectedRole)) roleSelect.value = selectedRole;
+    if (roles.includes(selectedRole)) roleSelect.value = selectedRole;
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof refreshConfigDrivenSelects === 'function') {
     refreshConfigDrivenSelects();
+    renderSystemConfigEditor();
   }
 });
 
@@ -918,14 +1542,7 @@ function getEquipeRolesByArea(area) {
 
 function getEquipeAreaLabel(area) {
   const key = String(area || '').toLowerCase();
-  const map = {
-    obras: 'Obras',
-    eletrica: 'Elétrica',
-    hidraulica: 'Hidráulica',
-    civil: 'Civil',
-    administrativo: 'Administrativo'
-  };
-  return map[key] || 'Obras';
+  return getSystemConfig().teamAreaLabels[key] || key || 'Obras';
 }
 
 function buildEquipeInitials(name) {
@@ -1016,10 +1633,10 @@ function setEquipeRoleOptions(area, selectedRole = '') {
   if (!select) return;
 
   const roles = getEquipeRolesByArea(area);
-  select.innerHTML = roles.map((role) => `<option value="${role}">${role}</option>`).join('');
+  renderSelectOptions(select, roles.map((role) => ({ value: role, label: role })), null);
 
   const hasSelected = roles.some((role) => normalizeEquipeText(role) === normalizeEquipeText(selectedRole));
-  select.value = hasSelected ? selectedRole : roles[0];
+  select.value = hasSelected ? selectedRole : (roles[0] || '');
 }
 
 function onEquipeAreaChange(area) {
@@ -1506,6 +2123,8 @@ function clearTenantScopedMemory() {
       items.length = 0;
     });
   window._systemConfig = null;
+  window._systemConfigStorageSnapshot = null;
+  window._systemConfigStorageInvalid = false;
   window._reisPrimaryDataState = 'idle';
   window._reisPrimaryDataError = '';
   equipesLastSyncSource = 'local';
@@ -1984,6 +2603,7 @@ function resetNovoFornecedorModal() {
 }
 
 function openEditarFornecedor(id) {
+  if (!requireModulePermission('fornecedores', 'edit', 'editar fornecedores')) return;
   const fornId = String(id || '').trim();
   if (!fornId) return;
   const fornecedor = (Array.isArray(fornecedoresData) ? fornecedoresData : []).find((item) => String(item.id || '') === fornId);
@@ -1992,7 +2612,9 @@ function openEditarFornecedor(id) {
     return;
   }
 
+  window._openingEditSupplierModal = true;
   openModal('modal-novo-fornecedor');
+  window._openingEditSupplierModal = false;
   const modalTitle = document.getElementById('forn-modal-title');
   const saveBtn = document.getElementById('forn-save-btn');
 
@@ -2010,6 +2632,7 @@ function openEditarFornecedor(id) {
 }
 
 async function toggleFornecedorStatus(id) {
+  if (!requireModulePermission('fornecedores', 'edit', 'alterar fornecedores')) return;
   const fornId = String(id || '').trim();
   if (!fornId) return;
   const idx = (Array.isArray(fornecedoresData) ? fornecedoresData : []).findIndex((item) => String(item.id || '') === fornId);
@@ -2042,6 +2665,7 @@ async function toggleFornecedorStatus(id) {
 
 async function salvarFornecedor() {
   const editId = String(document.getElementById('forn-edit-id')?.value || '').trim();
+  if (!requireModulePermission('fornecedores', editId ? 'edit' : 'create', editId ? 'editar fornecedores' : 'cadastrar fornecedores')) return;
   const nome = String(document.getElementById('forn-nome')?.value || '').trim();
   const categoria = String(document.getElementById('forn-categoria')?.value || '').trim().toLowerCase();
   const vendedor = String(document.getElementById('forn-vendedor')?.value || '').trim();
@@ -2459,7 +3083,10 @@ function resetNovoMembroModal() {
   if (telefone) telefone.value = '';
   if (email) email.value = '';
   if (diaria) diaria.value = '';
-  if (acesso) acesso.value = 'nao';
+  if (acesso) {
+    acesso.value = 'nao';
+    acesso.disabled = false;
+  }
   if (perfilAcesso) {
     perfilAcesso.value = 'Visualizador';
     perfilAcesso.disabled = true;
@@ -2469,6 +3096,10 @@ function resetNovoMembroModal() {
 }
 
 function openEditarMembroEquipe(memberId) {
+  if (!hasModulePermission('equipes', 'edit')) {
+    showAccessDenied('editar equipes');
+    return;
+  }
   const id = String(memberId || '').trim();
   if (!id) return;
 
@@ -2478,7 +3109,9 @@ function openEditarMembroEquipe(memberId) {
     return;
   }
 
+  window._openingEditMemberModal = true;
   openModal('modal-novo-membro');
+  window._openingEditMemberModal = false;
 
   const modalTitle = document.getElementById('eq-modal-title');
   const editId = document.getElementById('eq-edit-id');
@@ -2507,13 +3140,21 @@ function openEditarMembroEquipe(memberId) {
   if (diaria) diaria.value = member.diaria || '';
   if (acesso) acesso.value = permissao ? 'sim' : 'nao';
   if (perfilAcesso) {
-    perfilAcesso.value = permissao?.perfil || 'Visualizador';
-    perfilAcesso.disabled = !permissao;
+    perfilAcesso.value = permissao?.isAdmin ? 'Administrador' : permissao?.perfil || 'Visualizador';
+    perfilAcesso.disabled = !permissao || permissao.isAdmin;
+  }
+  if (acesso) {
+    acesso.value = permissao ? 'sim' : 'nao';
+    acesso.disabled = Boolean(permissao?.isAdmin);
   }
   if (obra) obra.value = member.obra && member.obra !== '—' ? member.obra : '';
 }
 
 async function toggleMembroEquipeStatus(memberId) {
+  if (!hasModulePermission('equipes', 'edit')) {
+    showAccessDenied('editar equipes');
+    return;
+  }
   const id = String(memberId || '').trim();
   if (!id) return;
 
@@ -2551,6 +3192,7 @@ async function toggleMembroEquipeStatus(memberId) {
 
 async function salvarMembroEquipe() {
   const editId = String(document.getElementById('eq-edit-id')?.value || '').trim();
+  if (!requireModulePermission('equipes', editId ? 'edit' : 'create', editId ? 'editar membros da equipe' : 'cadastrar membros da equipe')) return;
   const nome = String(document.getElementById('eq-nome')?.value || '').trim();
   const area = String(document.getElementById('eq-area')?.value || 'obras').toLowerCase();
   const role = String(document.getElementById('eq-funcao')?.value || '').trim();
@@ -2620,7 +3262,9 @@ async function salvarMembroEquipe() {
   const existingAcesso = getPermissaoAcessoByEquipeId(sourceMember.id);
   let accountAccessUpdated = true;
 
-  if (acesso === 'sim') {
+  if (existingAcesso?.isAdmin) {
+    accountAccessUpdated = true;
+  } else if (acesso === 'sim') {
     const usuarioPayload = normalizeUsuarioSistema({
       id: existingAcesso?.id,
       equipeId: sourceMember.id,
@@ -2897,6 +3541,7 @@ function populateEstoqueMaterialOptions() {
 }
 
 function toggleEstoqueCreator() {
+  if (!requireModulePermission('estoque', 'create', 'cadastrar itens de estoque')) return;
   if (typeof openModal === 'function') {
     openModal('modal-novo-item-estoque');
   }
@@ -3227,6 +3872,9 @@ async function syncEstoqueFromSupabaseByEvents(options = {}) {
 }
 
 async function excluirItemEstoqueNoSupabase(code) {
+  if (!requireModulePermission('estoque', 'delete', 'excluir itens de estoque')) {
+    return { ok: false, fallback: false, error: new Error('Permissao de exclusao de estoque obrigatoria.') };
+  }
   if (!window.db?.from) return { ok: false, fallback: true, error: null };
 
   const hasSession = await hasSupabaseSession();
@@ -3278,6 +3926,7 @@ function editarItemDraftEstoque(draftId) {
 }
 
 function removerItemDraftEstoque(draftId) {
+  if (!requireModulePermission('estoque', 'delete', 'excluir itens de estoque')) return;
   const id = String(draftId || '').trim();
   const idx = estoqueDraftItems.findIndex((entry) => String(entry._draftId || '') === id);
   if (idx < 0) return;
@@ -3292,6 +3941,7 @@ function removerItemDraftEstoque(draftId) {
 
 function salvarNovoItemEstoque() {
   const wasEditing = Boolean(estoqueDraftEditId);
+  if (!requireModulePermission('estoque', wasEditing ? 'edit' : 'create', wasEditing ? 'editar itens de estoque' : 'cadastrar itens de estoque')) return;
   const codeRaw = String(document.getElementById('est-item-codigo')?.value || '').trim().toUpperCase();
   const name = String(document.getElementById('est-item-nome')?.value || '').trim();
   const cat = String(document.getElementById('est-item-categoria')?.value || '').trim();
@@ -3361,6 +4011,7 @@ function salvarNovoItemEstoque() {
 }
 
 async function cadastrarItensEstoqueLote() {
+  if (!requireModulePermission('estoque', 'create', 'cadastrar itens de estoque')) return;
   if (estoqueDraftItems.length === 0) {
     showToast('Adicione ao menos um item na pré-lista.', 'warning');
     return;
@@ -3405,6 +4056,10 @@ async function cadastrarItensEstoqueLote() {
 }
 
 function openEditarItemEstoque(code) {
+  if (!hasModulePermission('estoque', 'edit')) {
+    showAccessDenied('editar estoque');
+    return;
+  }
   const itemCode = String(code || '').trim();
   if (!itemCode) return;
 
@@ -3427,6 +4082,7 @@ function openEditarItemEstoque(code) {
 }
 
 async function salvarEdicaoItemEstoque() {
+  if (!requireModulePermission('estoque', 'edit', 'editar itens de estoque')) return;
   const code = String(document.getElementById('est-edit-code')?.value || '').trim();
   const name = String(document.getElementById('est-edit-nome')?.value || '').trim();
   const cat = String(document.getElementById('est-edit-categoria')?.value || '').trim();
@@ -3515,6 +4171,7 @@ async function salvarEdicaoItemEstoque() {
 }
 
 async function excluirItemEstoqueEditando() {
+  if (!requireModulePermission('estoque', 'delete', 'excluir itens de estoque')) return;
   const code = String(document.getElementById('est-edit-code')?.value || '').trim();
   if (!code) {
     showToast('Item inválido para exclusão.', 'warning');
@@ -3583,6 +4240,7 @@ function resetEntradaEstoqueModal() {
 }
 
 async function registrarEntradaEstoque() {
+  if (!requireModulePermission('estoque', 'create', 'registrar movimentacoes de estoque')) return;
   const code = String(document.getElementById('est-entrada-item')?.value || '').trim();
   const qtdEntrada = Math.floor(parseEstoqueNumber(document.getElementById('est-entrada-qtd')?.value || 0));
   const custoEntrada = parseEstoqueNumber(document.getElementById('est-entrada-custo')?.value || 0);
@@ -4283,15 +4941,29 @@ function setFinTab(tab, element) {
   if (tab === 'fluxo') drawFluxo();
 }
 
-function carregarObrasNoSelectFinanceiro() {
+async function carregarObrasNoSelectFinanceiro() {
   const select = document.getElementById('fin-obra-id');
   if (!select) return;
 
-  select.innerHTML = '<option value="">Nenhuma obra</option>';
-  (Array.isArray(obras) ? obras : []).forEach((obra) => {
+  select.replaceChildren(new Option('Nenhuma obra', ''));
+  let options = Array.isArray(obras) ? obras : [];
+  if (!hasModulePermission('obras') && hasModulePermission('financeiro')) {
+    try {
+      const { data, error } = await db.rpc('app_finance_work_options');
+      if (error) throw error;
+      if (!Array.isArray(data)) throw new Error('O servidor retornou uma lista de obras invalida.');
+      options = data.map((row) => ({ id: row.id, code: row.codigo, name: row.nome }));
+    } catch (error) {
+      console.error('Falha ao carregar os vinculos de obras do lancamento financeiro.', error);
+      showToast(`Nao foi possivel carregar as obras: ${error?.message || 'erro desconhecido'}`, 'error');
+      return;
+    }
+  }
+
+  options.forEach((obra) => {
     const idValue = String(obra.id || '').trim();
     if (!idValue) return;
-    select.innerHTML += `<option value="${idValue}">${obra.code} - ${obra.name}</option>`;
+    select.add(new Option(`${obra.code} - ${obra.name}`, idValue));
   });
 }
 
@@ -4358,9 +5030,15 @@ async function openLancamentoFinanceiro(tipo, referencia) {
   const kind = String(tipo || 'receber').toLowerCase();
   const ref = String(referencia || '').trim();
 
+  if (!hasModulePermission('financeiro', ref ? 'edit' : 'create')) {
+    showAccessDenied('editar financeiro');
+    return;
+  }
+  window._openingEditFinanceModal = Boolean(ref);
   openModal('modal-lancamento');
+  window._openingEditFinanceModal = false;
   if (typeof carregarClientesNoSelect === 'function') await carregarClientesNoSelect('fin-cliente-id');
-  if (typeof carregarObrasNoSelectFinanceiro === 'function') carregarObrasNoSelectFinanceiro();
+  if (typeof carregarObrasNoSelectFinanceiro === 'function') await carregarObrasNoSelectFinanceiro();
 
   const title = document.getElementById('fin-modal-title');
   const saveBtn = document.getElementById('fin-save-btn');
@@ -4485,6 +5163,7 @@ function applyLancamentoStatusButtonStyle(button, status) {
 }
 
 async function alternarStatusLancamentoFinanceiro() {
+  if (!requireModulePermission('financeiro', 'edit', 'alterar lancamentos financeiros')) return;
   const editRef = String(document.getElementById('fin-edit-ref')?.value || '').trim();
   const tipo = String(document.getElementById('fin-tipo')?.value || 'receber').toLowerCase();
   const currentStatus = String(document.getElementById('fin-status-current')?.value || '').toLowerCase();
@@ -5032,27 +5711,135 @@ function switchLoginTab(tab, button) {
   }
 }
 
-function goToApp(nome, cargo = 'operador') {
+function clearUnauthorizedModuleMemory() {
+  if (!hasModulePermission('obras')) obras.length = 0;
+  if (!hasModulePermission('orcamentos')) orcamentos.length = 0;
+  if (!hasModulePermission('clientes')) clientes.length = 0;
+  if (!hasModulePermission('financeiro')) {
+    financRec.length = 0;
+    financPag.length = 0;
+  }
+  if (!hasModulePermission('equipes')) {
+    equipeData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(EQUIPE_DATA_STORAGE_KEY);
+  }
+  if (!hasModulePermission('estoque')) {
+    estoqueData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(ESTOQUE_DATA_STORAGE_KEY);
+  }
+  if (!hasModulePermission('fornecedores')) {
+    fornecedoresData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(FORNECEDORES_DATA_STORAGE_KEY);
+  }
+  if (!hasModulePermission('usuarios', 'admin')) {
+    usuariosSistemaData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(USUARIOS_SISTEMA_STORAGE_KEY);
+  }
+}
+
+async function syncAuthorizedOperationalData() {
+  if (hasModulePermission('equipes')) {
+    await syncEquipesFromSupabase({ silent: true });
+  } else {
+    equipeData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(EQUIPE_DATA_STORAGE_KEY);
+    equipesLastSyncSource = 'none';
+  }
+
+  if (hasModulePermission('fornecedores')) {
+    await syncFornecedoresFromSupabase({ silent: true });
+  } else {
+    fornecedoresData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(FORNECEDORES_DATA_STORAGE_KEY);
+    fornecedoresLastSyncSource = 'none';
+  }
+
+  if (hasModulePermission('estoque')) {
+    await syncEstoqueFromSupabaseByEvents({ silent: true });
+  } else {
+    estoqueData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(ESTOQUE_DATA_STORAGE_KEY);
+    estoqueLastSyncSource = 'none';
+  }
+
+  if (!hasModulePermission('usuarios', 'admin')) {
+    usuariosSistemaData.length = 0;
+    window.ReisFlowTenantStorage?.removeItem(USUARIOS_SISTEMA_STORAGE_KEY);
+  }
+}
+
+async function handlePermissionRefreshFailure(error) {
+  console.error('Falha ao atualizar as permissoes da sessao.', error);
+  window._currentPermissionsLoaded = false;
+  window._currentPermissions = null;
+  try {
+    await db.auth.signOut();
+  } catch (signOutError) {
+    console.error('Falha ao encerrar a sessao apos erro de autorizacao.', signOutError);
+  }
+  clearAuthScopedState();
+  goToLogin();
+  showToast('Nao foi possivel confirmar suas permissoes. A sessao foi encerrada por seguranca.', 'error');
+}
+
+async function goToApp(nome, cargo = 'operador') {
   if (!window._reisActiveAuthScope) {
     goToLogin();
     showToast('Sessao sem escopo de organizacao. O acesso foi bloqueado.', 'error');
     return;
   }
 
+  try {
+    await refreshCurrentUserPermissions();
+  } catch (error) {
+    await handlePermissionRefreshFailure(error);
+    return;
+  }
+  clearUnauthorizedModuleMemory();
+
   if (typeof setCurrentUserContext === 'function') {
     setCurrentUserContext(nome, cargo);
   }
 
+  window._systemConfig = null;
+  window._systemConfigStorageSnapshot = null;
+  window._systemConfigStorageInvalid = false;
+  refreshConfigDrivenSelects();
+  renderSystemConfigEditor();
+
   document.getElementById('page-login').classList.remove('active');
   document.getElementById('page-app').classList.add('active');
   if (typeof applyRolePermissions === 'function') applyRolePermissions();
+  const initialView = Object.keys(PERMISSION_VIEW_MODULES).find((view) => canAccessView(view));
+  if (!initialView) {
+    await handlePermissionRefreshFailure(new Error('A conta nao possui uma tela autorizada.'));
+    return;
+  }
+  navigate(initialView, null);
   buildDashChart();
+  if (window._permissionRefreshTimer) clearInterval(window._permissionRefreshTimer);
+  window._permissionRefreshTimer = setInterval(async () => {
+    const previous = JSON.stringify(window._currentPermissions);
+    try {
+      await refreshCurrentUserPermissions();
+      if (previous !== JSON.stringify(window._currentPermissions)) {
+        clearUnauthorizedModuleMemory();
+        applyRolePermissions();
+        renderSystemConfigEditor();
+        if (!canAccessView(window._currentView)) {
+          const allowedView = Object.keys(PERMISSION_VIEW_MODULES).find((view) => canAccessView(view));
+          if (allowedView) navigate(allowedView, null);
+        }
+        await loadAllData();
+        await syncAuthorizedOperationalData();
+      }
+    } catch (error) {
+      await handlePermissionRefreshFailure(error);
+    }
+  }, 30000);
+
   Promise.resolve(typeof loadAllData === 'function' ? loadAllData() : null)
-    .then(async () => {
-      await syncEquipesFromSupabase({ silent: true });
-      await syncFornecedoresFromSupabase({ silent: true });
-      await syncEstoqueFromSupabaseByEvents({ silent: true });
-    })
+    .then(syncAuthorizedOperationalData)
     .then(() => {
       updateFornecedoresSummary();
       populateFornecedorDatalist();

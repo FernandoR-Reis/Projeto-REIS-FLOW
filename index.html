@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="assets/css/styles.css?v=20260806-1">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261014-1">
 </head>
 <body>
 
@@ -221,6 +221,7 @@
       <div class="nav-item" onclick="navigate('estoque',this)"><i class="ti ti-packages"></i><span class="label">Estoque</span></div>
       <div class="nav-item" onclick="navigate('fornecedores',this)"><i class="ti ti-truck-delivery"></i><span class="label">Fornecedores</span></div>
       <div class="nav-section-label">Sistema</div>
+      <div class="nav-item" onclick="navigate('cadastros',this)"><i class="ti ti-adjustments-horizontal"></i><span class="label">Cadastros Auxiliares</span></div>
       <div class="nav-item" onclick="navigate('configuracoes',this)"><i class="ti ti-settings"></i><span class="label">Configurações</span></div>
     </nav>
     <div class="sidebar-footer">
@@ -268,12 +269,17 @@
             <p id="dash-metrics-meta">Resumo operacional</p>
           </div>
           <div class="page-header-right">
-            <select id="dash-period" class="filter-select" style="font-size:12px" onchange="onDashboardPeriodChange()">
-            </select>
+            <div class="dashboard-header-actions">
+              <select id="dash-period" class="filter-select" style="font-size:12px" onchange="onDashboardPeriodChange()">
+              </select>
+              <button class="btn btn-secondary btn-sm" id="dash-personalize-btn" type="button" onclick="openDashboardPreferences()">
+                <i class="ti ti-adjustments-horizontal"></i>Personalizar Dashboard
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="alert alert-warning" id="dash-obras-alert" style="margin-bottom:16px;display:none">
+        <div class="alert alert-warning" id="dash-obras-alert" data-dashboard-widget="obras-atrasadas" style="margin-bottom:16px;display:none">
           <i class="ti ti-alert-triangle"></i>
           <div>
             <div class="alert-title" id="dash-obras-alert-title">Obras com alerta de prazo</div>
@@ -281,56 +287,56 @@
           </div>
         </div>
 
-        <div class="stats-grid">
-          <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
+        <div class="stats-grid" data-dashboard-container>
+          <div class="stat-card" data-dashboard-widget="obras-ativas" data-permission-module="obras" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Ativas</div>
             <div class="stat-value" id="dash-obras-ativas-value" style="color:var(--petrol-light)">—</div>
             <div class="stat-sub" id="dash-obras-ativas-sub">Carregando dados…</div>
             <i class="ti ti-building-factory-2 stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--red)" onclick="navigate('obras',null)">
+          <div class="stat-card" data-dashboard-widget="obras-atrasadas" data-permission-module="obras" style="--accent:var(--red)" onclick="navigate('obras',null)">
             <div class="stat-label">Obras Atrasadas</div>
             <div class="stat-value" id="dash-obras-atrasadas-value" style="color:var(--red)">—</div>
             <div class="stat-sub" id="dash-obras-atrasadas-sub">Carregando dados…</div>
             <i class="ti ti-alert-circle stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--green)">
+          <div class="stat-card" data-dashboard-widget="faturamento-mensal" data-permission-module="financeiro" style="--accent:var(--green)">
             <div class="stat-label">Faturamento Mensal</div>
             <div class="stat-value" id="dash-faturamento-mensal-value" style="color:var(--green)">—</div>
             <div class="stat-sub" id="dash-faturamento-mensal-sub">Carregando dados…</div>
             <i class="ti ti-cash stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:#A76EF6">
+          <div class="stat-card" data-dashboard-widget="lucro-previsto" data-permission-module="financeiro" style="--accent:#A76EF6">
             <div class="stat-label">Lucro Previsto</div>
             <div class="stat-value" id="dash-lucro-previsto-value" style="color:#A76EF6">—</div>
             <div class="stat-sub" id="dash-lucro-previsto-sub">Custos previstos indisponíveis</div>
             <i class="ti ti-trending-up stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
+          <div class="stat-card" data-dashboard-widget="orcamentos-pendentes" data-permission-module="orcamentos" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
             <div class="stat-label">Orç. Pendentes</div>
             <div class="stat-value" id="dash-orc-pendentes-value" style="color:var(--orange)">—</div>
             <div class="stat-sub" id="dash-orc-pendentes-sub">Carregando dados…</div>
             <i class="ti ti-file-dollar stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
+          <div class="stat-card" data-dashboard-widget="equipes-em-campo" data-permission-module="equipes" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
             <div class="stat-label">Equipes em Campo</div>
             <div class="stat-value" id="dash-equipes-campo-value" style="color:var(--petrol-light)">—</div>
             <div class="stat-sub" id="dash-equipes-campo-sub">Carregando dados…</div>
             <i class="ti ti-hard-hat stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
+          <div class="stat-card" data-dashboard-widget="contas-vencendo" data-permission-module="financeiro" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
             <div class="stat-label">Contas Vencendo</div>
             <div class="stat-value" id="dash-contas-vencendo-value" style="color:var(--red)">—</div>
             <div class="stat-sub" id="dash-contas-vencendo-sub">Carregando dados…</div>
             <i class="ti ti-calendar-due stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
+          <div class="stat-card" data-dashboard-widget="a-receber" data-permission-module="financeiro" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
             <div class="stat-label">A Receber</div>
             <div class="stat-value" id="dash-a-receber-value" style="color:var(--green)">—</div>
             <div class="stat-sub" id="dash-a-receber-sub">Carregando dados…</div>
             <i class="ti ti-receipt stat-icon"></i>
           </div>
-          <div class="stat-card" style="--accent:var(--orange)" onclick="navigate('estoque',null)">
+          <div class="stat-card" data-dashboard-widget="estoque-critico" data-permission-module="estoque" style="--accent:var(--orange)" onclick="navigate('estoque',null)">
             <div class="stat-label">Estoque Crítico</div>
             <div class="stat-value" id="dash-estoque-critico-value" style="color:var(--orange)">—</div>
             <div class="stat-sub" id="dash-estoque-critico-sub">Carregando dados…</div>
@@ -338,30 +344,30 @@
           </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom:20px">
-          <div class="card">
+        <div class="grid-2" style="margin-bottom:20px" data-dashboard-container>
+          <div class="card" data-dashboard-widget="grafico-faturamento" data-permission-module="financeiro">
             <div class="section-hdr"><h3>Faturamento Mensal</h3><span id="chart-period-label" style="font-size:11px;color:var(--text-muted)">Carregando…</span></div>
             <div style="height:160px;display:flex;align-items:flex-end;gap:5px;padding-top:10px" id="chart-fat"></div>
             <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--text-muted)" id="chart-labels"></div>
           </div>
-          <div class="card">
+          <div class="card" data-dashboard-widget="status-obras" data-permission-module="obras">
             <div class="section-hdr"><h3>Status das Obras</h3></div>
             <div id="dash-obras-status" style="display:flex;flex-direction:column;gap:10px;padding-top:8px"></div>
           </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom:20px">
-          <div class="card">
+        <div class="grid-2" style="margin-bottom:20px" data-dashboard-container>
+          <div class="card" data-dashboard-widget="ultimas-obras" data-permission-module="obras">
             <div class="section-hdr"><h3>Últimas Obras</h3><button onclick="navigate('obras',null)">Ver todas →</button></div>
             <div id="dash-recent-works" style="display:flex;flex-direction:column;gap:8px"><div class="muted">Aguardando sincronização.</div></div>
           </div>
-          <div class="card">
+          <div class="card" data-dashboard-widget="tarefas-pendentes" data-permission-module="obras">
             <div class="section-hdr"><h3>Tarefas Pendentes</h3></div>
             <div class="muted">A lista de tarefas ainda não possui fonte de dados integrada.</div>
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-dashboard-widget="clientes-recentes" data-permission-module="clientes">
           <div class="section-hdr"><h3>Clientes</h3><button onclick="navigate('clientes',null)">Ver todos →</button></div>
           <div class="table-wrap">
             <table>
@@ -801,6 +807,48 @@
         </div>
       </div>
 
+      <div class="view fade-in" id="view-cadastros" style="display:none">
+        <div class="page-header">
+          <div class="page-header-left">
+            <h2>Cadastros Auxiliares</h2>
+            <p>Organize as listas usadas em fornecedores, estoque, lançamentos e funções da equipe.</p>
+          </div>
+          <div class="page-header-right config-actions">
+            <button class="btn btn-sm btn-secondary" type="button" onclick="saveSystemConfigFromEditor()"><i class="ti ti-device-floppy"></i>Salvar ajustes</button>
+            <button class="btn btn-sm btn-ghost" type="button" onclick="resetSystemConfigToDefaults()"><i class="ti ti-restore"></i>Restaurar padrão</button>
+          </div>
+        </div>
+
+        <section class="card config-panel config-panel-wide" id="cfg-cadastros">
+          <div class="config-aux-grid">
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias de fornecedores</div>
+              <div class="config-item-list" id="cfg-supplier-categories-list"></div>
+              <button class="btn btn-secondary btn-xs" type="button" onclick="openConfigItemEditor('supplierCategories')"><i class="ti ti-plus"></i>Adicionar categoria</button>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias de estoque</div>
+              <div class="config-item-list" id="cfg-stock-categories-list"></div>
+              <button class="btn btn-secondary btn-xs" type="button" onclick="openConfigItemEditor('stockCategories')"><i class="ti ti-plus"></i>Adicionar categoria</button>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Categorias de lançamentos</div>
+              <div class="config-item-list" id="cfg-launch-categories-list"></div>
+              <button class="btn btn-secondary btn-xs" type="button" onclick="openConfigItemEditor('launchCategories')"><i class="ti ti-plus"></i>Adicionar categoria</button>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Áreas da equipe</div>
+              <div class="config-item-list" id="cfg-team-areas-list"></div>
+              <button class="btn btn-secondary btn-xs" type="button" onclick="openConfigItemEditor('teamAreas')"><i class="ti ti-plus"></i>Adicionar área</button>
+            </div>
+            <div class="config-mini-card">
+              <div class="config-mini-title">Funções da equipe por área</div>
+              <div id="cfg-team-roles-list" class="config-team-roles-list"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
       <div class="view fade-in" id="view-configuracoes" style="display:none">
         <div class="page-header">
           <div class="page-header-left">
@@ -811,7 +859,6 @@
 
         <div class="config-section-nav">
           <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-empresa').scrollIntoView({behavior:'smooth', block:'start'})">Empresa</button>
-          <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-cadastros').scrollIntoView({behavior:'smooth', block:'start'})">Cadastros auxiliares</button>
           <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-integracoes').scrollIntoView({behavior:'smooth', block:'start'})">Integrações</button>
           <button class="config-nav-pill" type="button" onclick="document.getElementById('cfg-aparencia').scrollIntoView({behavior:'smooth', block:'start'})">Aparência</button>
         </div>
@@ -859,53 +906,6 @@
           </div>
         </div>
 
-        <section class="card config-panel config-panel-wide" id="cfg-cadastros">
-          <div class="section-hdr">
-            <div>
-              <h3><i class="ti ti-adjustments-horizontal" style="font-size:14px;color:var(--petrol-light)"></i> Cadastros Auxiliares</h3>
-              <p class="muted" style="margin:6px 0 0;font-size:12px">Organize aqui as listas editáveis usadas em fornecedores, estoque, lançamentos e funções da equipe.</p>
-            </div>
-            <div class="config-actions">
-              <button class="btn btn-sm btn-secondary" type="button" onclick="saveSystemConfigFromEditor()"><i class="ti ti-device-floppy"></i>Salvar ajustes</button>
-              <button class="btn btn-sm btn-ghost" type="button" onclick="resetSystemConfigToDefaults()"><i class="ti ti-restore"></i>Restaurar padrão</button>
-            </div>
-          </div>
-
-          <div class="config-aux-grid">
-            <div class="config-mini-card">
-              <div class="config-mini-title">Categorias de fornecedores</div>
-              <textarea id="cfg-supplier-categories" rows="5" placeholder="Elétrica\nHidráulica\nCivil\nFerramentas\nEPI\nGeral"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Categorias de estoque</div>
-              <textarea id="cfg-stock-categories" rows="5" placeholder="Elétrica\nHidráulica\nCivil\nFerramentas\nEPI\nOutros"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Categorias do novo lançamento</div>
-              <textarea id="cfg-launch-categories" rows="5" placeholder="Serviços\nMaterial\nMão de obra\nAdministrativo"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Funções da equipe - Obras</div>
-              <textarea id="cfg-team-roles-obras" rows="5" placeholder="Mestre de Obras\nPedreiro\nAjudante"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Funções da equipe - Elétrica</div>
-              <textarea id="cfg-team-roles-eletrica" rows="5" placeholder="Eletricista\nEletricista Senior\nTécnico"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Funções da equipe - Hidráulica</div>
-              <textarea id="cfg-team-roles-hidraulica" rows="5" placeholder="Encanador\nTécnico Hidráulico\nAjudante"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Funções da equipe - Civil</div>
-              <textarea id="cfg-team-roles-civil" rows="5" placeholder="Pedreiro\nServente\nMestre de Obras"></textarea>
-            </div>
-            <div class="config-mini-card">
-              <div class="config-mini-title">Funções da equipe - Administrativo</div>
-              <textarea id="cfg-team-roles-administrativo" rows="5" placeholder="Comprador\nAssistente Administrativo\nFinanceiro"></textarea>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   </main>
@@ -1238,7 +1238,7 @@
     <div class="field" id="fin-field-cliente"><label>Cliente</label><select id="fin-cliente-id"><option value="">Carregando...</option></select></div>
     <div class="field" id="fin-field-fornecedor" style="display:none"><label>Fornecedor</label><input id="fin-fornecedor" placeholder="Ex: Hidrobom"></div>
     <div class="field-row"><div class="field"><label>Descrição</label><input id="fin-descricao" placeholder="Ex: Parcela 2/3 — OB-0031"></div><div class="field"><label>Valor</label><input id="fin-valor" placeholder="R$ 0,00" type="text" oninput="formatarMoedaInput(this)"></div></div>
-    <div class="field-row"><div class="field"><label>Vencimento</label><input id="fin-vencimento" type="date"></div><div class="field"><label>Categoria</label><select id="fin-categoria"><option>Serviços</option><option>Material</option><option>Mão de obra</option><option>Administrativo</option></select></div></div>
+    <div class="field-row"><div class="field"><label>Vencimento</label><input id="fin-vencimento" type="date"></div><div class="field"><div class="field-action-header"><label for="fin-categoria">Categoria</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('launchCategories','finance')">+ Criar nova categoria</button></div><select id="fin-categoria"><option>Serviços</option><option>Material</option><option>Mão de obra</option><option>Administrativo</option></select><div class="context-config-editor" id="context-config-launchCategories-finance" hidden><input id="context-config-input-launchCategories-finance" maxlength="60" placeholder="Nome da categoria" aria-label="Nome da nova categoria"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('launchCategories','finance')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('launchCategories','finance',false)">Cancelar</button></div></div></div>
     <div class="field" id="fin-field-obra"><label>Vinculado a</label><select id="fin-obra-id"><option value="">Nenhuma obra</option></select></div>
     <input type="hidden" id="fin-status-current" value="">
     <div class="modal-footer">
@@ -1258,19 +1258,19 @@
     <input type="hidden" id="eq-edit-id" value="">
     <div class="field-row">
       <div class="field"><label>Nome completo</label><input id="eq-nome" placeholder="Nome do técnico"></div>
-      <div class="field"><label>Área</label><select id="eq-area" onchange="onEquipeAreaChange(this.value)"><option value="obras">Obras</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="administrativo">Administrativo</option></select></div>
+      <div class="field"><div class="field-action-header"><label for="eq-area">Área</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('teamAreas','member')">+ Criar nova área</button></div><select id="eq-area" onchange="onEquipeAreaChange(this.value)"><option value="obras">Obras</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="administrativo">Administrativo</option></select><div class="context-config-editor" id="context-config-teamAreas-member" hidden><input id="context-config-input-teamAreas-member" maxlength="60" placeholder="Nome da área" aria-label="Nome da nova área"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('teamAreas','member')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('teamAreas','member',false)">Cancelar</button></div></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Função</label><select id="eq-funcao"></select></div>
+      <div class="field"><div class="field-action-header"><label for="eq-funcao">Função</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('teamRoles','member')">+ Criar nova função</button></div><select id="eq-funcao"></select><div class="context-config-editor" id="context-config-teamRoles-member" hidden><input id="context-config-input-teamRoles-member" maxlength="60" placeholder="Nome da função" aria-label="Nome da nova função"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('teamRoles','member')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('teamRoles','member',false)">Cancelar</button></div></div>
       <div class="field"><label>Status</label><select id="eq-status"><option value="disponivel">Disponível</option><option value="campo">Em campo</option><option value="afastado">Afastado</option></select></div>
     </div>
     <div class="field-row"><div class="field"><label>Telefone</label><input id="eq-telefone" placeholder="(11) 99999-0000" oninput="onEquipePhoneInput(this)"></div><div class="field"><label>E-mail</label><input id="eq-email" type="email" placeholder="nome@email.com"></div></div>
     <div class="field"><label>Diária</label><input id="eq-diaria" placeholder="R$ 0,00" oninput="onEquipeDiariaInput(this)"></div>
-    <div class="card" style="padding:12px;margin:10px 0;background:rgba(255,255,255,0.02)">
+    <div class="card" data-permission-module="usuarios" data-permission-action="admin" style="padding:12px;margin:10px 0;background:rgba(255,255,255,0.02)">
       <div class="section-hdr" style="margin-bottom:10px"><h3 style="font-size:13px"><i class="ti ti-lock" style="font-size:14px;color:var(--petrol-light)"></i> Acesso ao Sistema</h3></div>
       <div class="field-row" style="margin-bottom:0">
         <div class="field"><label>Terá acesso ao sistema?</label><select id="eq-acesso" onchange="onEquipeAcessoChange(this.value)"><option value="nao" selected>Não</option><option value="sim">Sim</option></select></div>
-        <div class="field"><label>Perfil de acesso</label><select id="eq-perfil-acesso" disabled><option>Administrador</option><option>Financeiro</option><option>Auxiliar Financeiro</option><option>Compras</option><option>Estoque</option><option>Obras</option><option>RH</option><option>Gerente</option><option>Comercial</option><option selected>Visualizador</option></select></div>
+        <div class="field"><label>Perfil de acesso</label><select id="eq-perfil-acesso" disabled><option value="Administrador" disabled>Administrador (restrito)</option><option>Financeiro</option><option>Auxiliar Financeiro</option><option>Compras</option><option>Estoque</option><option>Obras</option><option>RH</option><option>Gerente</option><option>Comercial</option><option selected>Visualizador</option></select></div>
       </div>
     </div>
     <div class="field"><label>Obra atual</label><input id="eq-obra" placeholder="Código da obra ou —"></div>
@@ -1309,6 +1309,32 @@
     <div id="eq-permissoes-summary" style="margin-top:8px;font-size:11px;color:var(--text-muted)"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-permissoes-equipe')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-user-permissions-editor">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-adjustments" style="margin-right:8px;color:var(--petrol-light)"></i>Permissões do usuário</div>
+      <button class="modal-close" onclick="closeModal('modal-user-permissions-editor')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="permission-user-summary">
+      <div><strong id="permission-user-name"></strong><div id="permission-user-email" class="muted"></div></div>
+      <div class="field"><label for="permission-template">Modelo de permissões</label><select id="permission-template" onchange="onPermissionTemplateChange(this.value)">
+        <option value="gerente">Gerente</option>
+        <option value="operacional">Operacional</option>
+        <option value="financeiro">Financeiro</option>
+        <option value="tecnico">Técnico</option>
+        <option value="visualizador">Visualizador</option>
+        <option value="personalizado">Personalizado</option>
+      </select></div>
+    </div>
+    <p class="muted permission-help">O Dashboard e o Financeiro são concedidos somente quando marcados. Gerenciar usuários e permissões continua reservado ao administrador da organização.</p>
+    <div id="permission-matrix" class="permission-matrix" onchange="onPermissionMatrixChange(event)"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user-permissions-editor')">Cancelar</button>
+      <button class="btn btn-primary" id="permission-save-btn" onclick="saveUserPermissions()"><i class="ti ti-check"></i>Salvar permissões</button>
     </div>
   </div>
 </div>
@@ -1388,7 +1414,7 @@
       <div class="field"><label>Material *</label><input id="est-edit-nome" placeholder="Nome do material"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Categoria *</label><select id="est-edit-categoria"><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select></div>
+      <div class="field"><div class="field-action-header"><label for="est-edit-categoria">Categoria *</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('stockCategories','stockEdit')">+ Criar nova categoria</button></div><select id="est-edit-categoria"><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select><div class="context-config-editor" id="context-config-stockCategories-stockEdit" hidden><input id="context-config-input-stockCategories-stockEdit" maxlength="60" placeholder="Nome da categoria" aria-label="Nome da nova categoria"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('stockCategories','stockEdit')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('stockCategories','stockEdit',false)">Cancelar</button></div></div>
       <div class="field"><label>Fornecedor</label><input id="est-edit-fornecedor" list="fornecedores-sugestoes" placeholder="Nome do fornecedor"></div>
     </div>
     <div class="field-row">
@@ -1415,7 +1441,7 @@
       <div class="field"><label>Material *</label><input id="est-item-nome" placeholder="Ex: Fita isolante 20m"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Categoria *</label><select id="est-item-categoria"><option value="">Selecione</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select></div>
+      <div class="field"><div class="field-action-header"><label for="est-item-categoria">Categoria *</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('stockCategories','stockNew')">+ Criar nova categoria</button></div><select id="est-item-categoria"><option value="">Selecione</option><option>Elétrica</option><option>Hidráulica</option><option>Civil</option><option>Ferramentas</option><option>EPI</option><option>Outros</option></select><div class="context-config-editor" id="context-config-stockCategories-stockNew" hidden><input id="context-config-input-stockCategories-stockNew" maxlength="60" placeholder="Nome da categoria" aria-label="Nome da nova categoria"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('stockCategories','stockNew')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('stockCategories','stockNew',false)">Cancelar</button></div></div>
       <div class="field"><label>Fornecedor</label><input id="est-item-fornecedor" list="fornecedores-sugestoes" placeholder="Ex: Elétrica Premium"></div>
     </div>
     <div class="field-row">
@@ -1453,7 +1479,7 @@
     <input type="hidden" id="forn-edit-id" value="">
     <div class="field-row">
       <div class="field"><label>Fornecedor *</label><input id="forn-nome" placeholder="Ex: Elétrica Premium" required></div>
-      <div class="field"><label>Categoria principal *</label><select id="forn-categoria"><option value="">Selecione</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="ferramentas">Ferramentas</option><option value="epi">EPI</option><option value="geral">Geral</option></select></div>
+      <div class="field"><div class="field-action-header"><label for="forn-categoria">Categoria principal *</label><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('supplierCategories','supplier')">+ Criar nova categoria</button></div><select id="forn-categoria"><option value="">Selecione</option><option value="eletrica">Elétrica</option><option value="hidraulica">Hidráulica</option><option value="civil">Civil</option><option value="ferramentas">Ferramentas</option><option value="epi">EPI</option><option value="geral">Geral</option></select><div class="context-config-editor" id="context-config-supplierCategories-supplier" hidden><input id="context-config-input-supplierCategories-supplier" maxlength="60" placeholder="Nome da categoria" aria-label="Nome da nova categoria"><button class="btn btn-primary btn-xs" type="button" onclick="createConfigItemFromContext('supplierCategories','supplier')">Salvar</button><button class="btn btn-ghost btn-xs" type="button" onclick="toggleContextConfigEditor('supplierCategories','supplier',false)">Cancelar</button></div></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Vendedor *</label><input id="forn-vendedor" placeholder="Nome do vendedor" required></div>
@@ -1472,6 +1498,32 @@
 </div>
 
 <datalist id="fornecedores-sugestoes"></datalist>
+
+<div class="modal-overlay" id="modal-dashboard-preferences" aria-hidden="true" onclick="handleDashboardPreferencesBackdrop(event)">
+  <div class="modal modal-dashboard-preferences" role="dialog" aria-modal="true" aria-labelledby="dashboard-preferences-title">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="dashboard-preferences-title">Personalizar Dashboard</div>
+        <p class="dashboard-preferences-description">Escolha os indicadores que deseja visualizar no seu dashboard.</p>
+      </div>
+      <button class="modal-close" id="dashboard-preferences-close" type="button" aria-label="Fechar" onclick="closeDashboardPreferences()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="dashboard-preferences-status" class="dashboard-preferences-status" role="status" aria-live="polite"></div>
+    <div id="dashboard-preferences-options" class="dashboard-preferences-options"></div>
+    <div class="dashboard-preferences-footer">
+      <button class="btn btn-ghost btn-sm" id="dashboard-preferences-restore" type="button" onclick="restoreDashboardPreferencesDefaults()">
+        <i class="ti ti-rotate"></i>Restaurar padrão
+      </button>
+      <span id="dashboard-preferences-count" class="dashboard-preferences-count"></span>
+      <div class="dashboard-preferences-actions">
+        <button class="btn btn-secondary btn-sm" id="dashboard-preferences-cancel" type="button" onclick="closeDashboardPreferences()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="dashboard-preferences-save" type="button" onclick="saveDashboardPreferences()">
+          <i class="ti ti-check"></i>Salvar visualização
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="modal-notifications">
   <div class="modal modal-notifications">
@@ -1492,13 +1544,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="assets/js/supabase-config.js?v=20261008-2"></script>
-<script src="assets/js/tenant-storage.js?v=20261009-2"></script>
+<script src="assets/js/tenant-storage.js?v=20261013-3"></script>
 <script src="assets/js/theme.js?v=20260703"></script>
 <script src="assets/js/metrics.js?v=20261008-1"></script>
-<script src="assets/js/app-part1.js?v=20261009-1"></script>
-<script src="assets/js/app-part2.js?v=20261009-1"></script>
+<script src="assets/js/app-part1.js?v=20261013-3"></script>
+<script src="assets/js/app-part2.js?v=20261013-2"></script>
+<script src="assets/js/dashboard-preferences.js?v=20261014-1"></script>
 <script src="assets/js/protection.js?v=20260703"></script>
-<script src="assets/js/auth.js?v=20261009-1"></script>
-<script src="assets/js/crud.js?v=20261009-1"></script>
+<script src="assets/js/auth.js?v=20261013-1"></script>
+<script src="assets/js/crud.js?v=20261013-1"></script>
 </body>
 </html>
