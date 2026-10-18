@@ -229,12 +229,42 @@
     };
   }
 
+  function aggregateMonthlyPaidFlows(receivables = [], payables = [], months = []) {
+    const receiving = Array.isArray(receivables) ? receivables : [];
+    const paying = Array.isArray(payables) ? payables : [];
+    return (Array.isArray(months) ? months : []).map((month) => {
+      const sumPaidInMonth = (items) => items
+        .filter((item) => getPaymentState(item) === 'quitado' && getPaidDateKey(item).slice(0, 7) === month.key)
+        .reduce((total, item) => total + parseMoney(item?.valor ?? item?.value), 0);
+      return {
+        ...month,
+        receipts: sumPaidInMonth(receiving),
+        payments: sumPaidInMonth(paying)
+      };
+    });
+  }
+
+  function aggregateWorkStatusCounts(works = [], statuses = []) {
+    const list = Array.isArray(works) ? works : [];
+    const keys = Array.isArray(statuses) ? statuses.map(normalizeStatus) : [];
+    const counts = Object.fromEntries(keys.map((key) => [key, 0]));
+    let other = 0;
+    list.forEach((work) => {
+      const status = normalizeStatus(work?.status);
+      if (Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1;
+      else other += 1;
+    });
+    return { counts, other, total: list.length };
+  }
+
   return {
     TIME_ZONE,
     addDays,
     aggregateBudgetMetrics,
     aggregateFinanceMetrics,
+    aggregateMonthlyPaidFlows,
     aggregateWorkMetrics,
+    aggregateWorkStatusCounts,
     calculateBudget,
     calculateItemCost,
     dayDifference,

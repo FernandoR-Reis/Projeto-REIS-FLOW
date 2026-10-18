@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<link rel="stylesheet" href="assets/css/styles.css?v=20261014-1">
+<link rel="stylesheet" href="assets/css/styles.css?v=20261018-1">
 </head>
 <body>
 
@@ -266,12 +266,13 @@
         <div class="page-header">
           <div class="page-header-left">
             <h2>Visão Geral</h2>
-            <p id="dash-metrics-meta">Resumo operacional</p>
+            <p id="dash-metrics-meta">Acompanhe sua operação e veja o que precisa de atenção.</p>
           </div>
           <div class="page-header-right">
             <div class="dashboard-header-actions">
-              <select id="dash-period" class="filter-select" style="font-size:12px" onchange="onDashboardPeriodChange()">
-              </select>
+              <span class="dashboard-sync-status is-loading" id="dash-sync-status" role="status" aria-live="polite">
+                <span class="dashboard-sync-dot"></span><span id="dash-sync-status-label">Sincronizando dados</span>
+              </span>
               <button class="btn btn-secondary btn-sm" id="dash-personalize-btn" type="button" onclick="openDashboardPreferences()">
                 <i class="ti ti-adjustments-horizontal"></i>Personalizar Dashboard
               </button>
@@ -287,88 +288,70 @@
           </div>
         </div>
 
-        <div class="stats-grid" data-dashboard-container>
-          <div class="stat-card" data-dashboard-widget="obras-ativas" data-permission-module="obras" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)">
+        <div class="stats-grid dashboard-primary-stats" data-dashboard-container>
+          <div class="stat-card" data-dashboard-widget="obras-ativas" data-permission-module="obras" style="--accent:var(--petrol-light)" onclick="navigate('obras',null)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigate('obras',null)}" role="button" tabindex="0">
             <div class="stat-label">Obras Ativas</div>
             <div class="stat-value" id="dash-obras-ativas-value" style="color:var(--petrol-light)">—</div>
             <div class="stat-sub" id="dash-obras-ativas-sub">Carregando dados…</div>
             <i class="ti ti-building-factory-2 stat-icon"></i>
           </div>
-          <div class="stat-card" data-dashboard-widget="obras-atrasadas" data-permission-module="obras" style="--accent:var(--red)" onclick="navigate('obras',null)">
+          <div class="stat-card" data-dashboard-widget="obras-atrasadas" data-permission-module="obras" style="--accent:var(--red)" onclick="navigate('obras',null)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigate('obras',null)}" role="button" tabindex="0">
             <div class="stat-label">Obras Atrasadas</div>
             <div class="stat-value" id="dash-obras-atrasadas-value" style="color:var(--red)">—</div>
             <div class="stat-sub" id="dash-obras-atrasadas-sub">Carregando dados…</div>
             <i class="ti ti-alert-circle stat-icon"></i>
           </div>
-          <div class="stat-card" data-dashboard-widget="faturamento-mensal" data-permission-module="financeiro" style="--accent:var(--green)">
-            <div class="stat-label">Faturamento Mensal</div>
-            <div class="stat-value" id="dash-faturamento-mensal-value" style="color:var(--green)">—</div>
-            <div class="stat-sub" id="dash-faturamento-mensal-sub">Carregando dados…</div>
-            <i class="ti ti-cash stat-icon"></i>
-          </div>
-          <div class="stat-card" data-dashboard-widget="lucro-previsto" data-permission-module="financeiro" style="--accent:#A76EF6">
-            <div class="stat-label">Lucro Previsto</div>
-            <div class="stat-value" id="dash-lucro-previsto-value" style="color:#A76EF6">—</div>
-            <div class="stat-sub" id="dash-lucro-previsto-sub">Custos previstos indisponíveis</div>
-            <i class="ti ti-trending-up stat-icon"></i>
-          </div>
-          <div class="stat-card" data-dashboard-widget="orcamentos-pendentes" data-permission-module="orcamentos" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)">
+          <div class="stat-card" data-dashboard-widget="orcamentos-pendentes" data-permission-module="orcamentos" style="--accent:var(--orange)" onclick="navigate('orcamentos',null)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigate('orcamentos',null)}" role="button" tabindex="0">
             <div class="stat-label">Orç. Pendentes</div>
             <div class="stat-value" id="dash-orc-pendentes-value" style="color:var(--orange)">—</div>
             <div class="stat-sub" id="dash-orc-pendentes-sub">Carregando dados…</div>
             <i class="ti ti-file-dollar stat-icon"></i>
           </div>
-          <div class="stat-card" data-dashboard-widget="equipes-em-campo" data-permission-module="equipes" style="--accent:var(--petrol-light)" onclick="navigate('equipes',null)">
-            <div class="stat-label">Equipes em Campo</div>
-            <div class="stat-value" id="dash-equipes-campo-value" style="color:var(--petrol-light)">—</div>
-            <div class="stat-sub" id="dash-equipes-campo-sub">Carregando dados…</div>
-            <i class="ti ti-hard-hat stat-icon"></i>
-          </div>
-          <div class="stat-card" data-dashboard-widget="contas-vencendo" data-permission-module="financeiro" style="--accent:var(--red)" onclick="navigate('financeiro',null)">
-            <div class="stat-label">Contas Vencendo</div>
-            <div class="stat-value" id="dash-contas-vencendo-value" style="color:var(--red)">—</div>
-            <div class="stat-sub" id="dash-contas-vencendo-sub">Carregando dados…</div>
-            <i class="ti ti-calendar-due stat-icon"></i>
-          </div>
-          <div class="stat-card" data-dashboard-widget="a-receber" data-permission-module="financeiro" style="--accent:var(--green)" onclick="navigate('financeiro',null)">
+          <div class="stat-card" data-dashboard-widget="a-receber" data-permission-module="financeiro" style="--accent:var(--green)" onclick="navigate('financeiro',null)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();navigate('financeiro',null)}" role="button" tabindex="0">
             <div class="stat-label">A Receber</div>
             <div class="stat-value" id="dash-a-receber-value" style="color:var(--green)">—</div>
             <div class="stat-sub" id="dash-a-receber-sub">Carregando dados…</div>
             <i class="ti ti-receipt stat-icon"></i>
           </div>
-          <div class="stat-card" data-dashboard-widget="estoque-critico" data-permission-module="estoque" style="--accent:var(--orange)" onclick="navigate('estoque',null)">
-            <div class="stat-label">Estoque Crítico</div>
-            <div class="stat-value" id="dash-estoque-critico-value" style="color:var(--orange)">—</div>
-            <div class="stat-sub" id="dash-estoque-critico-sub">Carregando dados…</div>
-            <i class="ti ti-package-import stat-icon"></i>
-          </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom:20px" data-dashboard-container>
+        <div class="grid-2 dashboard-middle-grid" data-dashboard-container>
           <div class="card" data-dashboard-widget="grafico-faturamento" data-permission-module="financeiro">
-            <div class="section-hdr"><h3>Faturamento Mensal</h3><span id="chart-period-label" style="font-size:11px;color:var(--text-muted)">Carregando…</span></div>
-            <div style="height:160px;display:flex;align-items:flex-end;gap:5px;padding-top:10px" id="chart-fat"></div>
-            <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--text-muted)" id="chart-labels"></div>
+            <div class="section-hdr dashboard-chart-header">
+              <div><h3>Resumo financeiro</h3><span id="chart-period-label">Carregando…</span></div>
+              <select id="dash-period" class="filter-select dashboard-chart-period" aria-label="Mês final do período" onchange="onDashboardPeriodChange()"></select>
+            </div>
+            <div class="dashboard-chart-legend" aria-label="Legenda do gráfico">
+              <span><i class="is-receivable"></i>Recebimentos</span>
+              <span><i class="is-payable"></i>Pagamentos</span>
+            </div>
+            <div id="chart-fat" class="dashboard-chart" role="img" aria-label="Recebimentos e pagamentos dos últimos seis meses"></div>
           </div>
           <div class="card" data-dashboard-widget="status-obras" data-permission-module="obras">
-            <div class="section-hdr"><h3>Status das Obras</h3></div>
+            <div class="section-hdr"><h3>Obras por status</h3><span class="dashboard-total-label" id="dash-work-total">0 obras</span></div>
             <div id="dash-obras-status" style="display:flex;flex-direction:column;gap:10px;padding-top:8px"></div>
           </div>
         </div>
 
-        <div class="grid-2" style="margin-bottom:20px" data-dashboard-container>
+        <div class="grid-2 dashboard-bottom-grid" data-dashboard-container>
           <div class="card" data-dashboard-widget="ultimas-obras" data-permission-module="obras">
-            <div class="section-hdr"><h3>Últimas Obras</h3><button onclick="navigate('obras',null)">Ver todas →</button></div>
-            <div id="dash-recent-works" style="display:flex;flex-direction:column;gap:8px"><div class="muted">Aguardando sincronização.</div></div>
+            <div class="section-hdr"><div><h3>Obras recentes</h3><span>Projetos adicionados recentemente</span></div><button onclick="navigate('obras',null)">Ver todas <i class="ti ti-arrow-up-right"></i></button></div>
+            <div id="dash-recent-works" class="dashboard-recent-list"><div class="muted">Aguardando sincronização.</div></div>
           </div>
-          <div class="card" data-dashboard-widget="tarefas-pendentes" data-permission-module="obras">
-            <div class="section-hdr"><h3>Tarefas Pendentes</h3></div>
-            <div class="muted">A lista de tarefas ainda não possui fonte de dados integrada.</div>
+          <div class="card" data-dashboard-widget="acoes-prioritarias">
+            <div class="section-hdr"><div><h3>Próximas ações</h3><span>O que merece sua atenção agora</span></div><span class="dashboard-action-count" id="dash-action-count">0</span></div>
+            <div id="dash-priority-actions" class="dashboard-action-list"><div class="muted">Aguardando sincronização.</div></div>
+            <div class="dashboard-support-metrics">
+              <div data-dashboard-widget="faturamento-mensal" data-permission-module="financeiro"><span>Recebido no mês</span><strong id="dash-faturamento-mensal-value">—</strong></div>
+              <div data-dashboard-widget="contas-vencendo" data-permission-module="financeiro"><span>Contas nos próximos 7 dias</span><strong id="dash-contas-vencendo-value">—</strong></div>
+              <div data-dashboard-widget="equipes-em-campo" data-permission-module="equipes"><span>Profissionais em campo</span><strong id="dash-equipes-campo-value">—</strong></div>
+              <div data-dashboard-widget="estoque-critico" data-permission-module="estoque"><span>Itens abaixo do mínimo</span><strong id="dash-estoque-critico-value">—</strong></div>
+            </div>
           </div>
         </div>
 
-        <div class="card" data-dashboard-widget="clientes-recentes" data-permission-module="clientes">
-          <div class="section-hdr"><h3>Clientes</h3><button onclick="navigate('clientes',null)">Ver todos →</button></div>
+        <div class="card dashboard-clients-card" data-dashboard-widget="clientes-recentes" data-permission-module="clientes">
+          <div class="section-hdr"><div><h3>Clientes recentes</h3><span>Relacionamento e carteira ativa</span></div><button onclick="navigate('clientes',null)">Ver todos <i class="ti ti-arrow-up-right"></i></button></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Cliente</th><th>Tipo</th><th>Obras</th><th>Valor contratado</th><th>Status</th></tr></thead>
@@ -867,12 +850,11 @@
           <div class="config-column">
             <section class="card config-panel" id="cfg-empresa">
               <div class="section-hdr"><h3><i class="ti ti-building" style="font-size:14px;color:var(--petrol-light)"></i> Dados da Empresa</h3></div>
-              <div class="field"><label>Razão Social</label><input type="text" placeholder="Razão social da empresa"></div>
-              <div class="field"><label>CNPJ</label><input type="text" placeholder="CNPJ"></div>
-              <div class="field"><label>E-mail</label><input type="text" placeholder="E-mail corporativo"></div>
-              <div class="field"><label>Telefone</label><input type="text" placeholder="Telefone comercial"></div>
-              <div class="field"><label>Endereço</label><input type="text" placeholder="Endereço da empresa"></div>
-              <button class="btn btn-primary btn-sm" onclick="showToast('Dados salvos com sucesso!','success')"><i class="ti ti-check"></i>Salvar alterações</button>
+              <div class="field"><label>Razão Social</label><input id="cfg-company-name" type="text" placeholder="Razão social da empresa"></div>
+              <div class="field"><label>CNPJ</label><input id="cfg-company-cnpj" type="text" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00" oninput="onCompanyCnpjInput(this)"></div>
+              <div class="field"><label>E-mail</label><input id="cfg-company-email" type="email" placeholder="E-mail corporativo"></div>
+              <div class="field"><label>Telefone</label><input id="cfg-company-phone" type="tel" inputmode="tel" maxlength="15" placeholder="(11) 99999-0000" oninput="onCompanyPhoneInput(this)"></div>
+              <button class="btn btn-primary btn-sm" onclick="saveCompanyProfile()"><i class="ti ti-check"></i>Salvar alterações</button>
             </section>
 
           </div>
@@ -1139,6 +1121,7 @@
       <button class="modal-close" onclick="closeModal('modal-novo-cliente')"><i class="ti ti-x"></i></button>
     </div>
     <input id="cli-edit-doc" type="hidden" value="">
+    <input id="cli-edit-id" type="hidden" value="">
     <input id="cli-current-status" type="hidden" value="ativo">
     <div class="field"><label>Nome / Razão Social *</label><input id="cli-nome" placeholder="Nome completo ou empresa" required></div>
     <input id="cli-tipo" type="hidden" value="CNPJ">
@@ -1172,6 +1155,7 @@
       <button class="modal-close" onclick="closeModal('modal-cliente-detalhe')"><i class="ti ti-x"></i></button>
     </div>
     <input id="cliente-detail-doc-value" type="hidden" value="">
+    <input id="cliente-detail-id-value" type="hidden" value="">
     <input id="cliente-detail-status-value" type="hidden" value="">
     <div class="info-grid">
       <div class="info-item"><div class="lbl">Nome</div><div class="val" id="cliente-detail-nome">-</div></div>
@@ -1546,12 +1530,12 @@
 <script src="assets/js/supabase-config.js?v=20261008-2"></script>
 <script src="assets/js/tenant-storage.js?v=20261013-3"></script>
 <script src="assets/js/theme.js?v=20260703"></script>
-<script src="assets/js/metrics.js?v=20261008-1"></script>
-<script src="assets/js/app-part1.js?v=20261013-3"></script>
-<script src="assets/js/app-part2.js?v=20261013-2"></script>
-<script src="assets/js/dashboard-preferences.js?v=20261014-1"></script>
+<script src="assets/js/metrics.js?v=20261018-1"></script>
+<script src="assets/js/app-part1.js?v=20261018-1"></script>
+<script src="assets/js/app-part2.js?v=20261018-1"></script>
+<script src="assets/js/dashboard-preferences.js?v=20261018-1"></script>
 <script src="assets/js/protection.js?v=20260703"></script>
 <script src="assets/js/auth.js?v=20261013-1"></script>
-<script src="assets/js/crud.js?v=20261013-1"></script>
+<script src="assets/js/crud.js?v=20261018-1"></script>
 </body>
 </html>

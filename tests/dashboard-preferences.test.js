@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const script = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'dashboard-preferences.js'), 'utf8');
 
-function createHarness({ allowedModules = ['obras', 'financeiro', 'orcamentos', 'equipes', 'estoque', 'clientes'] } = {}) {
+function createHarness({ allowedModules = ['dashboard', 'obras', 'financeiro', 'orcamentos', 'equipes', 'estoque', 'clientes'] } = {}) {
   const widgets = [
     { key: 'obras-ativas', hidden: false, getAttribute: () => 'obras-ativas', hasAttribute: () => true },
     { key: 'faturamento-mensal', hidden: false, getAttribute: () => 'faturamento-mensal', hasAttribute: () => true }
@@ -65,6 +65,15 @@ test('available customization options follow module grants without changing thos
   assert.ok(available.some(({ key }) => key === 'obras-ativas'));
   assert.ok(!available.some(({ key }) => key === 'faturamento-mensal'));
   assert.equal(window.hasModulePermission('financeiro', 'view'), before);
+});
+
+test('dashboard exposes actionable priorities without listing unavailable profit or task data', () => {
+  const { api } = createHarness();
+  const availableKeys = api.getAvailableWidgets().map(({ key }) => key);
+
+  assert.ok(availableKeys.includes('acoes-prioritarias'));
+  assert.ok(!availableKeys.includes('lucro-previsto'));
+  assert.ok(!availableKeys.includes('tarefas-pendentes'));
 });
 
 test('hiding dashboard widgets collapses their rows and does not change component data', () => {

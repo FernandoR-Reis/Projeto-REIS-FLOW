@@ -6,8 +6,7 @@
       label: 'Financeiro',
       icon: 'ti-cash',
       items: [
-        { key: 'faturamento-mensal', label: 'Faturamento mensal', module: 'financeiro' },
-        { key: 'lucro-previsto', label: 'Lucro previsto', module: 'financeiro' },
+        { key: 'faturamento-mensal', label: 'Recebido no mês', module: 'financeiro' },
         { key: 'contas-vencendo', label: 'Contas vencendo', module: 'financeiro' },
         { key: 'a-receber', label: 'A receber', module: 'financeiro' },
         { key: 'grafico-faturamento', label: 'Gráfico de faturamento mensal', module: 'financeiro' }
@@ -22,7 +21,7 @@
         { key: 'obras-atrasadas', label: 'Obras atrasadas e alerta de prazo', module: 'obras' },
         { key: 'status-obras', label: 'Status das obras', module: 'obras' },
         { key: 'ultimas-obras', label: 'Últimas obras', module: 'obras' },
-        { key: 'tarefas-pendentes', label: 'Tarefas pendentes', module: 'obras' }
+        { key: 'acoes-prioritarias', label: 'Próximas ações', module: 'dashboard' }
       ]
     },
     {

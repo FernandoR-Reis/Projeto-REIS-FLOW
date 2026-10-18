@@ -123,3 +123,39 @@ test('finance aggregates use one due window and paid dates rather than creation 
   assert.equal(result.faturadoMes, 50);
   assert.equal(result.saldo, -175);
 });
+
+test('dashboard monthly finance series uses paid dates for receipts and payments', () => {
+  const result = metrics.aggregateMonthlyPaidFlows(
+    [
+      { status: 'recebido', paid_at: '2026-10-08', vencimento: '2026-09-30', valor: 450 },
+      { status: 'pendente', paid_at: '2026-10-09', valor: 800 }
+    ],
+    [
+      { status: 'pago', paid_at: '2026-10-02', vencimento: '2026-09-28', valor: 125 },
+      { status: 'pendente', paid_at: '2026-10-03', valor: 300 }
+    ],
+    [{ key: '2026-09' }, { key: '2026-10' }]
+  );
+
+  assert.deepEqual(result.map(({ key, receipts, payments }) => ({ key, receipts, payments })), [
+    { key: '2026-09', receipts: 0, payments: 0 },
+    { key: '2026-10', receipts: 450, payments: 125 }
+  ]);
+});
+
+test('dashboard work distribution accounts for every work, including unknown statuses', () => {
+  const result = metrics.aggregateWorkStatusCounts(
+    [
+      { status: 'andamento' },
+      { status: 'atrasada' },
+      { status: 'novo-status' }
+    ],
+    ['andamento', 'atrasada', 'concluida']
+  );
+
+  assert.deepEqual(result, {
+    counts: { andamento: 1, atrasada: 1, concluida: 0 },
+    other: 1,
+    total: 3
+  });
+});

@@ -256,12 +256,12 @@ async function ensureClientePendenteVisivel(nome, options = {}) {
   }
 }
 
-function salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, endereco = '', observacoes = '', status = 'ativo' }) {
+function salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, endereco = '', observacoes = '', status = 'ativo', id = null }) {
   const docKey = String(doc || '').replace(/\D/g, '');
   const nomeKey = String(nome || '').trim().toLowerCase();
   const listaAtual = lerClientesDemoLocal();
   const registroLocal = {
-    id: `local:${docKey || Date.now()}`,
+    id: id || `local:${docKey || Date.now()}`,
     nome,
     tipo_documento: tipo || null,
     documento: doc || null,
@@ -272,12 +272,14 @@ function salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, endereco = '', 
     observacoes
   };
 
-  const indexLocal = listaAtual.findIndex((item) => {
-    const itemDocKey = String(item.documento || '').replace(/\D/g, '');
-    const itemNomeKey = String(item.nome || '').trim().toLowerCase();
-    if (docKey && itemDocKey) return itemDocKey === docKey;
-    return !!nomeKey && itemNomeKey === nomeKey;
-  });
+  const indexLocal = id
+    ? listaAtual.findIndex((item) => String(item.id || '') === String(id))
+    : listaAtual.findIndex((item) => {
+        const itemDocKey = String(item.documento || '').replace(/\D/g, '');
+        const itemNomeKey = String(item.nome || '').trim().toLowerCase();
+        if (docKey && itemDocKey) return itemDocKey === docKey;
+        return !!nomeKey && itemNomeKey === nomeKey;
+      });
   if (indexLocal >= 0) {
     listaAtual[indexLocal] = { ...listaAtual[indexLocal], ...registroLocal, id: listaAtual[indexLocal].id || registroLocal.id };
   } else {
@@ -295,7 +297,8 @@ function salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, endereco = '', 
       email,
       status
     }, 0);
-    const indexUi = clientes.findIndex((item) => String(item.doc || '').replace(/\D/g, '') === docKey);
+    const indexUiById = id ? clientes.findIndex((item) => String(item.id || '') === String(id)) : -1;
+    const indexUi = indexUiById >= 0 ? indexUiById : clientes.findIndex((item) => String(item.doc || '').replace(/\D/g, '') === docKey);
     const indexUiByName = clientes.findIndex((item) => String(item.name || '').trim().toLowerCase() === nomeKey);
     const finalIndexUi = indexUi >= 0 ? indexUi : indexUiByName;
     if (finalIndexUi >= 0) {
@@ -1865,7 +1868,8 @@ async function salvarCliente() {
   const tel   = document.getElementById('cli-tel').value.trim();
   const email = document.getElementById('cli-email').value.trim();
   const editDoc = document.getElementById('cli-edit-doc')?.value?.trim() || '';
-  const isEditMode = !!editDoc;
+  const editId = document.getElementById('cli-edit-id')?.value?.trim() || '';
+  const isEditMode = !!editId || !!editDoc;
   if (!requireModulePermission('clientes', isEditMode ? 'edit' : 'create', isEditMode ? 'editar clientes' : 'criar clientes')) return;
 
   if (!nome) { showToast('Informe o nome do cliente', 'warning'); return; }
@@ -1912,11 +1916,18 @@ async function salvarCliente() {
   let error = null;
 
   if (isEditMode) {
-    const clienteAtual = typeof findClienteByDoc === 'function' ? findClienteByDoc(editDoc) : null;
-    const clienteId = clienteAtual?.id || null;
+    const clienteAtual = editId
+      ? (Array.isArray(clientes) ? clientes.find((cliente) => String(cliente.id || '') === editId) : null)
+      : (typeof findClienteByDoc === 'function' ? findClienteByDoc(editDoc) : null);
+    const clienteId = editId || clienteAtual?.id || null;
+
+    if (!clienteAtual && !clienteId) {
+      showToast('Não foi possível localizar o cliente que está sendo editado.', 'error');
+      return;
+    }
 
     if (isAdminLocalFallback) {
-      salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, status: 'ativo' });
+      salvarClienteEmModoLocal({ nome, tipo, doc, tel, email, status: 'ativo', id: clienteId });
     } else if (clienteId) {
       const result = await db.from('clientes').update({
         nome,
@@ -2002,9 +2013,13 @@ async function salvarCliente() {
 async function toggleClienteStatus(source = 'edit') {
   if (!requireModulePermission('clientes', 'edit', 'alterar clientes')) return;
   const isDetailMode = String(source || '').toLowerCase() === 'detail';
+  const clienteIdInput = isDetailMode
+    ? document.getElementById('cliente-detail-id-value')?.value?.trim() || ''
+    : document.getElementById('cli-edit-id')?.value?.trim() || '';
   const editDoc = isDetailMode
     ? document.getElementById('cliente-detail-doc-value')?.value?.trim() || ''
     : document.getElementById('cli-edit-doc')?.value?.trim() || '';
+  const clienteRef = clienteIdInput || editDoc;
   const statusInput = isDetailMode
     ? document.getElementById('cliente-detail-status-value')
     : document.getElementById('cli-current-status');
@@ -2013,12 +2028,14 @@ async function toggleClienteStatus(source = 'edit') {
     : document.getElementById('btn-toggle-cliente-status');
   const detailBadge = document.getElementById('cliente-detail-status');
 
-  if (!editDoc) {
+  if (!clienteRef) {
     showToast(isDetailMode ? 'Abra um cliente em detalhe para alterar o status.' : 'Abra um cliente em modo edição para alterar o status.', 'warning');
     return;
   }
 
-  const clienteAtual = typeof findClienteByDoc === 'function' ? findClienteByDoc(editDoc) : null;
+  const clienteAtual = typeof findClienteByReference === 'function'
+    ? findClienteByReference(clienteRef)
+    : (typeof findClienteByDoc === 'function' ? findClienteByDoc(editDoc) : null);
   if (!clienteAtual) {
     showToast('Cliente não encontrado para atualizar status.', 'warning');
     return;
@@ -2044,7 +2061,9 @@ async function toggleClienteStatus(source = 'edit') {
     error = result.error || null;
   } else {
     const docRef = String(editDoc || '').replace(/\D/g, '');
-    const index = clientes.findIndex((c) => String(c.doc || '').replace(/\D/g, '') === docRef);
+    const index = clienteId
+      ? clientes.findIndex((c) => String(c.id || '') === clienteId)
+      : clientes.findIndex((c) => String(c.doc || '').replace(/\D/g, '') === docRef);
     if (index >= 0) {
       clientes[index] = { ...clientes[index], status: novoStatus };
     }
@@ -2052,6 +2071,7 @@ async function toggleClienteStatus(source = 'edit') {
     if (isLocalFallback) {
       const localList = lerClientesDemoLocal();
       const localIndex = localList.findIndex((item) => {
+        if (clienteId) return String(item.id || '') === clienteId;
         const itemDoc = String(item.documento || '').replace(/\D/g, '');
         return !!itemDoc && itemDoc === docRef;
       });

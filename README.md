@@ -39,6 +39,10 @@ Resumo do estágio atual:
 - Fornecedores
 - Configurações
 
+### PDF de orçamento
+
+O PDF comercial usa a razão social, o CNPJ, o e-mail e o telefone cadastrados em **Configurações > Empresa**. Preencha esses dados antes de gerar o documento; somente um administrador pode salvá-los.
+
 ## Estrutura do projeto
 
 - [index.html](index.html) - estrutura principal e views

@@ -1255,7 +1255,20 @@ function refreshObraProgressFromChecklist() {
 }
 
 function setBreadcrumb(viewLabel) {
-  document.getElementById('topbar-breadcrumb').innerHTML = `<span>REIS FLOW</span><span class="sep">/</span><span class="cur">${viewLabel}</span>`;
+  const breadcrumb = document.getElementById('topbar-breadcrumb');
+  if (!breadcrumb) return;
+
+  window._currentBreadcrumbLabel = viewLabel;
+  const company = String(window._reisCompanyProfile?.nome || '').trim() || 'REIS FLOW';
+  const companyLabel = document.createElement('span');
+  companyLabel.textContent = company;
+  const separator = document.createElement('span');
+  separator.className = 'sep';
+  separator.textContent = '/';
+  const currentLabel = document.createElement('span');
+  currentLabel.className = 'cur';
+  currentLabel.textContent = viewLabel;
+  breadcrumb.replaceChildren(companyLabel, separator, currentLabel);
 }
 
 function navigate(view, element) {
@@ -1266,6 +1279,13 @@ function navigate(view, element) {
 
   window._currentView = view;
   window._currentObraCode = null;
+
+  if (view === 'configuracoes' && !window._reisCompanyProfile) {
+    loadCompanyProfile().catch((error) => {
+      console.error('Falha ao carregar os dados cadastrais da empresa.', error);
+      showToast('Não foi possível carregar os dados cadastrais da empresa.', 'error');
+    });
+  }
 
   document.querySelectorAll('.view').forEach((section) => {
     section.style.display = 'none';
@@ -1720,6 +1740,81 @@ async function openOrcamentoDetail(orcamentoId) {
   openModal('modal-orc-detalhe');
 }
 
+function formatQuotePdfDate(value) {
+  const date = value ? new Date(value) : new Date();
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('pt-BR');
+}
+
+async function loadCompanyProfile() {
+  const empresaId = typeof getCurrentEmpresaId === 'function' ? getCurrentEmpresaId() : null;
+  if (!empresaId) {
+    if (window._reisActiveAuthScope === 'local-demo') return null;
+    throw new Error('Não há uma empresa vinculada à sessão atual.');
+  }
+
+  const { data, error } = await db
+    .from('empresas')
+    .select('id, nome, cnpj, email, telefone')
+    .eq('id', empresaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Os dados da empresa não foram encontrados.');
+  if (typeof getCurrentEmpresaId === 'function' && getCurrentEmpresaId() !== empresaId) return null;
+
+  window._reisCompanyProfile = data;
+  if (window._currentBreadcrumbLabel) setBreadcrumb(window._currentBreadcrumbLabel);
+  const fields = {
+    'cfg-company-name': data.nome,
+    'cfg-company-cnpj': typeof formatFornecedorCnpj === 'function' ? formatFornecedorCnpj(data.cnpj) : data.cnpj,
+    'cfg-company-email': data.email,
+    'cfg-company-phone': typeof formatFornecedorTelefone === 'function' ? formatFornecedorTelefone(data.telefone) : data.telefone
+  };
+  Object.entries(fields).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input) input.value = value || '';
+  });
+  return data;
+}
+
+async function saveCompanyProfile() {
+  const empresaId = typeof getCurrentEmpresaId === 'function' ? getCurrentEmpresaId() : null;
+  if (!empresaId) {
+    showToast('Entre com uma conta vinculada a uma empresa para salvar os dados.', 'warning');
+    return;
+  }
+
+  const profile = {
+    nome: document.getElementById('cfg-company-name')?.value.trim() || '',
+    cnpj: document.getElementById('cfg-company-cnpj')?.value.trim() || null,
+    email: document.getElementById('cfg-company-email')?.value.trim() || null,
+    telefone: document.getElementById('cfg-company-phone')?.value.trim() || null
+  };
+  if (!profile.nome) {
+    showToast('Informe a razão social da empresa.', 'warning');
+    return;
+  }
+
+  const { data, error } = await db
+    .from('empresas')
+    .update(profile)
+    .eq('id', empresaId)
+    .select('id, nome, cnpj, email, telefone')
+    .maybeSingle();
+  if (error) {
+    console.error('Falha ao salvar os dados da empresa.', error);
+    showToast('Não foi possível salvar os dados da empresa. Verifique suas permissões.', 'error');
+    return;
+  }
+  if (!data) {
+    showToast('Os dados da empresa não foram atualizados. Verifique suas permissões.', 'error');
+    return;
+  }
+
+  window._reisCompanyProfile = data;
+  if (window._currentBreadcrumbLabel) setBreadcrumb(window._currentBreadcrumbLabel);
+  showToast('Dados da empresa salvos.', 'success');
+}
+
 async function gerarPdfOrcamento(orcamentoId) {
   const id = String(orcamentoId || '').trim();
   const orc = (Array.isArray(orcamentos) ? orcamentos : []).find((item) => String(item.id || '') === id);
@@ -1733,56 +1828,219 @@ async function gerarPdfOrcamento(orcamentoId) {
     return;
   }
 
-  const itens = await loadOrcamentoItens(id);
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  let y = 18;
-  doc.setFontSize(16);
-  doc.text(`Orçamento ${orc.code || ''}`, 14, y);
-  y += 10;
-
-  doc.setFontSize(11);
-  doc.text(`Cliente: ${orc.client || '—'}`, 14, y); y += 7;
-  doc.text(`Descrição: ${orc.desc || '—'}`, 14, y); y += 7;
-  doc.text(`Valor: ${orc.valor || '—'}`, 14, y); y += 7;
-  const costTotal = Array.isArray(itens) ? ReisFlowMetrics.calculateItemCost(itens) : null;
-  const derivedMargin = costTotal === null ? null : ReisFlowMetrics.deriveMargin(orc.valorNumerico ?? orc.valor, costTotal);
-  doc.text(`Margem: ${derivedMargin === null ? 'não calculável sem itens' : `${derivedMargin.toFixed(2)}%`}`, 14, y); y += 7;
-  if (costTotal !== null) {
-    doc.text(`Custo dos itens: ${formatCurrencyBRL(costTotal)} | Lucro: ${formatCurrencyBRL(Number(orc.valorNumerico ?? ReisFlowMetrics.parseMoney(orc.valor)) - costTotal)}`, 14, y);
-    y += 7;
-  } else {
-    doc.text('Custo/lucro: não calculável sem itens carregados.', 14, y);
-    y += 7;
+  let itens;
+  let empresa;
+  try {
+    [itens, empresa] = await Promise.all([
+      loadOrcamentoItens(id),
+      loadCompanyProfile()
+    ]);
+  } catch (error) {
+    console.error('Falha ao preparar dados do PDF do orçamento.', error);
+    showToast('Não foi possível carregar os dados da empresa ou do orçamento para gerar o PDF.', 'error');
+    return;
   }
-  doc.text(`Deslocamento: ${orc.deslocamento == null ? 'não registrado' : formatCurrencyBRL(orc.deslocamento)} | Desconto: ${orc.desconto == null ? 'não registrado' : formatCurrencyBRL(orc.desconto)}`, 14, y);
-  y += 7;
-  doc.text(`Validade: ${orc.validade || '—'}`, 14, y); y += 10;
+  if (!Array.isArray(itens)) return;
+  if (!empresa) {
+    showToast('Entre com uma conta vinculada à empresa para gerar o PDF.', 'warning');
+    return;
+  }
+  const missingCompanyDetails = [
+    ['razão social', empresa.nome],
+    ['CNPJ', empresa.cnpj],
+    ['e-mail', empresa.email],
+    ['telefone', empresa.telefone]
+  ].filter(([, value]) => !String(value || '').trim()).map(([label]) => label);
+  if (missingCompanyDetails.length > 0) {
+    showToast(`Complete ${missingCompanyDetails.join(', ')} em Configurações > Empresa antes de gerar o PDF.`, 'warning');
+    return;
+  }
 
-  doc.setFontSize(12);
-  doc.text('Itens do orçamento', 14, y);
-  y += 8;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const left = 14;
+  const right = pageWidth - left;
+  const contentWidth = right - left;
+  const footerTop = pageHeight - 24;
+  const currency = (value) => formatCurrencyBRL(Number(value || 0));
+  const total = Number(orc.valorNumerico ?? ReisFlowMetrics.parseMoney(orc.valor));
+  const displacement = orc.deslocamento == null ? null : Number(orc.deslocamento);
+  const discount = orc.desconto == null ? null : Number(orc.desconto);
+  const adjustmentsKnown = displacement !== null && discount !== null;
+  const subtotal = adjustmentsKnown ? total - displacement + discount : total;
+  const itemCosts = itens.map((item) => ReisFlowMetrics.calculateItemCost([item]));
+  const itemQuantities = itens.map((item) => Math.max(0, Number(item.quantidade || 0)));
+  const costWeight = itemCosts.reduce((sum, amount) => sum + amount, 0);
+  const quantityIndices = itemQuantities
+    .map((quantity, index) => quantity > 0 ? index : -1)
+    .filter((index) => index >= 0);
+  const positiveCostIndices = costWeight > 0
+    ? quantityIndices.filter((index) => itemCosts[index] > 0)
+    : quantityIndices;
+  const eligibleIndices = positiveCostIndices.length ? positiveCostIndices : quantityIndices;
+  const itemAmounts = itens.map(() => 0);
+  let allocated = 0;
+  eligibleIndices.forEach((index, eligibleIndex) => {
+    const isLast = eligibleIndex === eligibleIndices.length - 1;
+    const weight = costWeight > 0
+      ? itemCosts[index] / costWeight
+      : 1 / eligibleIndices.length;
+    const amount = isLast ? ReisFlowMetrics.roundMoney(subtotal - allocated) : ReisFlowMetrics.roundMoney(subtotal * weight);
+    itemAmounts[index] = amount;
+    allocated = ReisFlowMetrics.roundMoney(allocated + amount);
+  });
 
-  doc.setFontSize(10);
-  if (!Array.isArray(itens)) {
-    doc.text('Itens indisponíveis; a composição financeira não foi incluída.', 14, y);
-  } else if (itens.length === 0) {
-    doc.text('Sem itens cadastrados.', 14, y);
+  const statusLabels = {
+    pendente: 'AGUARDANDO',
+    cliente_pendente: 'AGUARDANDO CLIENTE',
+    dados_incompletos: 'DADOS PENDENTES',
+    aprovado: 'APROVADO',
+    reprovado: 'REPROVADO',
+    expirado: 'EXPIRADO'
+  };
+  const status = String(orc.statusOriginal || orc.status || 'pendente').toLowerCase();
+  const statusLabel = statusLabels[status] || 'AGUARDANDO';
+  let y = 0;
+
+  const drawText = (text, x, top, size, color, style = 'normal', options = {}) => {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+    doc.text(String(text), x, top, options);
+  };
+  const drawTableHeader = (top) => {
+    doc.setFillColor(240, 244, 247);
+    doc.roundedRect(left, top, contentWidth, 8, 2, 2, 'F');
+    drawText('DESCRIÇÃO', left + 5, top + 5.5, 7.5, [71, 91, 112], 'bold');
+    drawText('QTD.', 116, top + 5.5, 7.5, [71, 91, 112], 'bold', { align: 'center' });
+    drawText('VALOR UNIT.', 149, top + 5.5, 7.5, [71, 91, 112], 'bold', { align: 'center' });
+    drawText('TOTAL', right - 5, top + 5.5, 7.5, [71, 91, 112], 'bold', { align: 'right' });
+    return top + 11;
+  };
+  const drawFirstPageHeader = () => {
+    doc.setFillColor(20, 52, 75);
+    doc.roundedRect(left, 8, contentWidth, 54, 5, 5, 'F');
+    doc.setFillColor(48, 78, 100);
+    doc.roundedRect(left + 9, 15, 16, 16, 3, 3, 'F');
+    const initials = String(empresa.nome || 'RF')
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0] || '')
+      .join('')
+      .toUpperCase();
+    drawText(initials || 'RF', left + 17, 25.5, 13, [255, 255, 255], 'bold', { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    const companyNameLines = doc.splitTextToSize(empresa.nome, 124).slice(0, 2);
+    doc.setTextColor(255, 255, 255);
+    doc.text(companyNameLines, left + 30, 20.5);
+    drawText('ORÇAMENTO COMERCIAL', left + 9, 37, 7.5, [206, 222, 234], 'bold');
+    drawText(`Orçamento ${orc.code || ''}`, left + 9, 47, 18, [255, 255, 255], 'bold');
+
+    const badgeWidth = Math.max(28, Math.min(45, doc.getTextWidth(statusLabel) + 12));
+    const badgeX = right - badgeWidth - 9;
+    doc.setFillColor(215, 247, 235);
+    doc.roundedRect(badgeX, 35.5, badgeWidth, 8, 4, 4, 'F');
+    doc.setFillColor(27, 139, 104);
+    doc.circle(badgeX + 4, 39.5, 1.3, 'F');
+    drawText(statusLabel, badgeX + badgeWidth / 2 + 1, 42.5, 7, [27, 105, 82], 'bold', { align: 'center' });
+    drawText(`Emitido em ${formatQuotePdfDate(orc.createdAt)}`, left + 9, 55, 8, [232, 239, 245]);
+    drawText(`Válido até ${orc.validade || '—'}`, left + 66, 55, 8, [232, 239, 245]);
+  };
+  const drawContinuationHeader = () => {
+    doc.setFillColor(20, 52, 75);
+    doc.roundedRect(left, 10, contentWidth, 20, 3, 3, 'F');
+    drawText(empresa.nome || 'Minha Empresa', left + 5, 18, 10, [255, 255, 255], 'bold');
+    drawText(`Orçamento ${orc.code || ''}`, right - 5, 18, 10, [255, 255, 255], 'bold', { align: 'right' });
+  };
+  const addPage = (repeatTableHeader = false) => {
+    doc.addPage();
+    drawContinuationHeader();
+    y = repeatTableHeader ? drawTableHeader(38) : 40;
+  };
+
+  drawFirstPageHeader();
+  drawText('PROPOSTA PARA', left, 68, 7.5, [105, 124, 143], 'bold');
+  drawText(orc.client || 'Cliente', left, 76, 12, [20, 52, 75], 'bold');
+  const descriptionLines = doc.splitTextToSize(orc.desc || '—', contentWidth);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(91, 111, 130);
+  doc.text(descriptionLines, left, 82);
+  y = 87 + Math.max(0, descriptionLines.length - 1) * 4;
+  doc.setDrawColor(226, 232, 238);
+  doc.line(left, y, right, y);
+  y += 4;
+  drawText('Itens e serviços', left, y, 11, [20, 52, 75], 'bold');
+  y += 4;
+  drawText('Confira os itens incluídos nesta proposta.', left, y, 8, [105, 124, 143]);
+  y = drawTableHeader(y + 3);
+
+  if (itens.length === 0) {
+    drawText('Nenhum item cadastrado neste orçamento.', left + 5, y + 4, 9, [91, 111, 130]);
+    y += 13;
   } else {
     itens.forEach((item, index) => {
-      const qtd = Number(item.quantidade || 0);
-      const unit = Number(item.valor_unitario || 0);
-      const total = ReisFlowMetrics.calculateItemCost([item]);
-      const linha = `${index + 1}. ${item.descricao || '—'} | Qtd: ${qtd.toLocaleString('pt-BR')} | Unit: ${unit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
-      const linhas = doc.splitTextToSize(linha, 182);
-      doc.text(linhas, 14, y);
-      y += linhas.length * 5;
-      if (y > 280) {
-        doc.addPage();
-        y = 18;
-      }
+      const quantity = itemQuantities[index];
+      const lineTotal = itemAmounts[index];
+      const unitPrice = quantity > 0 ? ReisFlowMetrics.roundMoney(lineTotal / quantity) : 0;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const lines = doc.splitTextToSize(String(item.descricao || `Item ${String(index + 1).padStart(2, '0')}`), 79);
+      const rowHeight = Math.max(12, lines.length * 4 + 5);
+      if (index === 8 && doc.internal.getNumberOfPages() === 1) addPage(true);
+      else if (y + rowHeight > footerTop - 4) addPage(true);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(20, 52, 75);
+      doc.text(lines, left + 5, y + 4.5);
+      drawText(quantity.toLocaleString('pt-BR'), 116, y + 6.5, 8.5, [71, 91, 112], 'normal', { align: 'center' });
+      drawText(currency(unitPrice), 149, y + 6.5, 8.5, [71, 91, 112], 'normal', { align: 'center' });
+      drawText(currency(lineTotal), right - 5, y + 6.5, 8.5, [20, 52, 75], 'bold', { align: 'right' });
+      doc.setDrawColor(226, 232, 238);
+      doc.line(left, y + rowHeight, right, y + rowHeight);
+      y += rowHeight;
     });
+  }
+
+  if (y + 61 > footerTop) addPage();
+  const summaryTop = y + 2;
+  doc.setFillColor(246, 248, 250);
+  doc.roundedRect(left, summaryTop, contentWidth, 32, 3, 3, 'F');
+  drawText('Subtotal', left + 6, summaryTop + 7, 8.5, [91, 111, 130]);
+  drawText(currency(subtotal), right - 6, summaryTop + 7, 8.5, [71, 91, 112], 'normal', { align: 'right' });
+  drawText('Deslocamento', left + 6, summaryTop + 14, 8.5, [91, 111, 130]);
+  drawText(displacement === null ? 'Não informado' : currency(displacement), right - 6, summaryTop + 14, 8.5, [71, 91, 112], 'normal', { align: 'right' });
+  drawText('Desconto', left + 6, summaryTop + 21, 8.5, [91, 111, 130]);
+  drawText(discount === null ? 'Não informado' : `-${currency(discount)}`, right - 6, summaryTop + 21, 8.5, [71, 91, 112], 'normal', { align: 'right' });
+  doc.setDrawColor(220, 228, 234);
+  doc.line(left + 6, summaryTop + 25, right - 6, summaryTop + 25);
+  drawText('VALOR TOTAL', left + 6, summaryTop + 30, 11, [20, 52, 75], 'bold');
+  drawText(currency(total), right - 6, summaryTop + 30, 14, [20, 52, 75], 'bold', { align: 'right' });
+
+  const conditionsTop = summaryTop + 38;
+  drawText('Condições comerciais', left, conditionsTop, 10, [20, 52, 75], 'bold');
+  drawText('Pagamento: conforme combinado', left, conditionsTop + 6, 8.5, [105, 124, 143]);
+  drawText('Prazo de execução: a combinar após aprovação', left, conditionsTop + 12, 8.5, [105, 124, 143]);
+  drawText(`Esta proposta é válida até ${orc.validade || '—'}.`, left, conditionsTop + 18, 8.5, [105, 124, 143]);
+
+  const contactDetails = [
+    `Telefone: ${empresa.telefone || 'Não informado'}`,
+    `E-mail: ${empresa.email || 'Não informado'}`,
+    `CNPJ: ${empresa.cnpj || 'Não informado'}`
+  ];
+  for (let index = 1; index <= doc.internal.getNumberOfPages(); index += 1) {
+    doc.setPage(index);
+    doc.setDrawColor(226, 232, 238);
+    doc.line(left, footerTop, right, footerTop);
+    drawText('Dúvidas? Fale com a nossa equipe.', left, footerTop + 7, 9, [20, 52, 75], 'bold');
+    drawText(contactDetails[0], left, footerTop + 14, 8, [105, 124, 143]);
+    drawText(contactDetails[1], left + 48, footerTop + 14, 8, [105, 124, 143]);
+    drawText(contactDetails[2], left, footerTop + 20, 8, [105, 124, 143]);
+    drawText(`${index} / ${doc.internal.getNumberOfPages()}`, right, pageHeight - 7, 7, [145, 158, 170], 'normal', { align: 'right' });
   }
 
   doc.save(`Orcamento-${orc.code || 'sem-codigo'}.pdf`);
@@ -1865,40 +2123,72 @@ function populateOrcPreview() {
 async function loadAllData() {
   window._reisPrimaryDataState = 'loading';
   window._reisPrimaryDataError = '';
+  window._reisDashboardModuleStates = Object.fromEntries(
+    ['obras', 'orcamentos', 'clientes', 'financeiro'].map((moduleName) => [
+      moduleName,
+      hasModulePermission(moduleName) ? 'loading' : 'unavailable'
+    ])
+  );
   try {
     const emptyResult = { data: [], error: null };
+    const permittedModules = {
+      obras: hasModulePermission('obras'),
+      orcamentos: hasModulePermission('orcamentos'),
+      clientes: hasModulePermission('clientes'),
+      financeiro: hasModulePermission('financeiro')
+    };
     const [resObras, resOrc, resOrcItens, resCli, resFinance] = await Promise.all([
-      hasModulePermission('obras') ? db.from('obras').select('*, clientes(nome)').order('created_at', { ascending: false }) : emptyResult,
-      hasModulePermission('orcamentos') ? db.from('orcamentos').select('*, clientes(nome), cliente_nome_avulso').order('created_at', { ascending: false }) : emptyResult,
-      hasModulePermission('orcamentos') ? db.from('orcamento_itens').select('orcamento_id, quantidade, valor_unitario') : emptyResult,
-      hasModulePermission('clientes') ? db.from('clientes').select('*').order('created_at', { ascending: false }) : emptyResult,
-      hasModulePermission('financeiro') ? db.rpc('app_finance_data') : { data: { receivables: [], payables: [] }, error: null }
+      permittedModules.obras ? db.from('obras').select(permittedModules.clientes ? '*, clientes(nome)' : '*').order('created_at', { ascending: false }) : emptyResult,
+      permittedModules.orcamentos ? db.from('orcamentos').select(permittedModules.clientes ? '*, clientes(nome), cliente_nome_avulso' : '*, cliente_nome_avulso').order('created_at', { ascending: false }) : emptyResult,
+      permittedModules.orcamentos ? db.from('orcamento_itens').select('orcamento_id, quantidade, valor_unitario') : emptyResult,
+      permittedModules.clientes ? db.from('clientes').select('*').order('created_at', { ascending: false }) : emptyResult,
+      permittedModules.financeiro ? db.rpc('app_finance_data') : { data: { receivables: [], payables: [] }, error: null }
     ]);
     const resFinRec = { data: resFinance?.data?.receivables, error: resFinance?.error };
     const resFinPag = { data: resFinance?.data?.payables, error: resFinance?.error };
 
-    const queryErrors = [
-      resObras?.error,
-      resOrc?.error,
-      resOrcItens?.error,
-      resCli?.error,
-      resFinRec?.error,
-      resFinPag?.error
-    ].filter(Boolean);
-
-    if (queryErrors.length > 0) {
-      throw queryErrors[0];
-    }
-    if (hasModulePermission('financeiro') && (
+    const moduleErrors = {
+      obras: resObras?.error || (permittedModules.obras && !Array.isArray(resObras?.data) ? new Error('O servidor retornou uma lista de obras inválida.') : null),
+      orcamentos: resOrc?.error || resOrcItens?.error || (permittedModules.orcamentos && (!Array.isArray(resOrc?.data) || !Array.isArray(resOrcItens?.data)) ? new Error('O servidor retornou dados de orçamento inválidos.') : null),
+      clientes: resCli?.error || (permittedModules.clientes && !Array.isArray(resCli?.data) ? new Error('O servidor retornou uma lista de clientes inválida.') : null),
+      financeiro: resFinRec?.error || resFinPag?.error || null
+    };
+    if (permittedModules.financeiro && !moduleErrors.financeiro && (
       !Array.isArray(resFinance?.data?.receivables)
       || !Array.isArray(resFinance?.data?.payables)
     )) {
-      throw new Error('O servidor retornou dados financeiros invalidos.');
+      moduleErrors.financeiro = new Error('O servidor retornou dados financeiros inválidos.');
     }
+    window._reisDashboardModuleStates = Object.fromEntries(
+      Object.entries(permittedModules).map(([moduleName, permitted]) => [
+        moduleName,
+        !permitted ? 'unavailable' : moduleErrors[moduleName] ? 'error' : 'synced'
+      ])
+    );
+    window._reisDashboardModuleUpdatedAt = window._reisDashboardModuleUpdatedAt || {};
+    Object.entries(window._reisDashboardModuleStates).forEach(([moduleName, state]) => {
+      if (state === 'synced') {
+        window._reisDashboardModuleUpdatedAt[moduleName] = new Date().toISOString();
+      } else if (state === 'error') {
+        delete window._reisDashboardModuleUpdatedAt[moduleName];
+      }
+    });
+    const failedModules = Object.entries(moduleErrors).filter(([, error]) => error);
+    failedModules.forEach(([moduleName, error]) => {
+      console.error(`Falha ao carregar dados do módulo ${moduleName}.`, error);
+    });
+    const sourceData = {
+      obras: moduleErrors.obras ? [] : (resObras.data || []),
+      orcamentos: moduleErrors.orcamentos ? [] : (resOrc.data || []),
+      orcamentoItens: moduleErrors.orcamentos ? [] : (resOrcItens.data || []),
+      clientes: moduleErrors.clientes ? [] : (resCli.data || []),
+      recebimentos: moduleErrors.financeiro ? [] : (resFinRec.data || []),
+      pagamentos: moduleErrors.financeiro ? [] : (resFinPag.data || [])
+    };
 
     // Sobrescreve os arrays do sistema com dados reais
     obras.length = 0;
-    (resObras.data || []).forEach((o) => {
+    sourceData.obras.forEach((o) => {
       const prazo = o.prazo || '';
       obras.push({
         id: o.id || null,
@@ -1919,12 +2209,12 @@ async function loadAllData() {
 
     orcamentos.length = 0;
     const costByBudget = new Map();
-    (resOrcItens.data || []).forEach((item) => {
+    sourceData.orcamentoItens.forEach((item) => {
       const id = String(item.orcamento_id || '');
       const cost = ReisFlowMetrics.calculateItemCost([item]);
       costByBudget.set(id, ReisFlowMetrics.roundMoney((costByBudget.get(id) || 0) + cost));
     });
-    (resOrc.data || []).forEach((o) => {
+    sourceData.orcamentos.forEach((o) => {
       const value = Number(o.valor || 0);
       const cost = costByBudget.has(String(o.id)) ? costByBudget.get(String(o.id)) : null;
       const validity = o.validade || '';
@@ -1932,6 +2222,7 @@ async function loadAllData() {
       orcamentos.push({
         id: o.id || null,
         code: o.codigo,
+        createdAt: o.created_at || null,
         clientId: o.cliente_id || null,
         client: o.clientes?.nome || o.cliente_nome_avulso || 'Cadastro pendente',
         pendingClientName: o.cliente_nome_avulso || '',
@@ -1960,7 +2251,7 @@ async function loadAllData() {
         'linear-gradient(135deg,#1A1D24,#3A4055)',
         'linear-gradient(135deg,#3B3B1A,#8A8A2A)'
       ];
-      (resCli.data || []).forEach((c, i) => {
+      sourceData.clientes.forEach((c, i) => {
         const partes = c.nome.split(' ');
         const iniciais = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : c.nome.slice(0, 2);
         const emailLocal = typeof getClienteEmailByDoc === 'function' ? getClienteEmailByDoc(c.documento) : '';
@@ -1982,7 +2273,7 @@ async function loadAllData() {
 
     if (typeof financRec !== 'undefined' && Array.isArray(financRec)) {
       financRec.length = 0;
-      (resFinRec.data || []).forEach((item) => {
+      sourceData.recebimentos.forEach((item) => {
         const dueDate = item.vencimento || '';
         financRec.push({
           ref: item.referencia,
@@ -2003,7 +2294,7 @@ async function loadAllData() {
 
     if (typeof financPag !== 'undefined' && Array.isArray(financPag)) {
       financPag.length = 0;
-      (resFinPag.data || []).forEach((item) => {
+      sourceData.pagamentos.forEach((item) => {
         const dueDate = item.vencimento || '';
         financPag.push({
           ref: item.referencia,
@@ -2019,8 +2310,18 @@ async function loadAllData() {
       });
     }
 
-    window._reisPrimaryDataState = 'synced';
-    window._reisPrimaryDataError = '';
+    try {
+      await loadCompanyProfile();
+    } catch (error) {
+      console.error('Falha ao carregar os dados cadastrais da empresa.', error);
+      showToast('Não foi possível carregar os dados cadastrais da empresa.', 'error');
+    }
+
+    window._reisPrimaryDataState = failedModules.length > 0 ? 'error' : 'synced';
+    window._reisPrimaryDataError = failedModules.map(([moduleName, error]) => `${moduleName}: ${error.message || 'falha de sincronização'}`).join('; ');
+    if (failedModules.length > 0) {
+      showToast(`Falha parcial ao sincronizar: ${failedModules.map(([moduleName]) => moduleName).join(', ')}. Os outros módulos foram carregados normalmente.`, 'warning');
+    }
     updateClientesSummary();
     populateObras();
     populateOrc();
@@ -2034,6 +2335,13 @@ async function loadAllData() {
     financPag.length = 0;
     window._reisPrimaryDataState = 'error';
     window._reisPrimaryDataError = String(err?.message || err || 'Falha desconhecida ao carregar os dados.');
+    window._reisDashboardModuleStates = Object.fromEntries(
+      ['obras', 'orcamentos', 'clientes', 'financeiro'].map((moduleName) => [
+        moduleName,
+        hasModulePermission(moduleName) ? 'error' : 'unavailable'
+      ])
+    );
+    window._reisDashboardModuleUpdatedAt = {};
     console.error('Falha ao carregar dados do Supabase.', err);
     const raw = String(err?.message || '').toLowerCase();
     if (
@@ -2116,8 +2424,8 @@ function renderClientesTableRows(lista) {
   tbody.innerHTML = '';
   lista.forEach((cliente) => {
     const metrics = getClienteDashboardMetrics(cliente);
-    const docEncoded = encodeURIComponent(cliente.doc || '');
-    tbody.innerHTML += `<tr onclick="viewCliente('${docEncoded}')" style="cursor:pointer">
+    const clienteRef = encodeURIComponent(String(cliente.id || cliente.doc || ''));
+    tbody.innerHTML += `<tr onclick="viewCliente('${clienteRef}')" style="cursor:pointer">
       <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar-sm avatar" style="background:${cliente.bg}">${cliente.initials}</div><div><div class="bold">${cliente.name}</div><div style="font-size:11px;color:var(--text-muted)">${cliente.tipo}</div></div></div></td>
       <td class="mono" style="font-size:11px">${cliente.doc}</td>
       <td class="muted">${cliente.tel}</td>
@@ -2125,8 +2433,8 @@ function renderClientesTableRows(lista) {
       <td><span class="profit-up"><i class="ti ti-trending-up"></i>${formatCurrencyBRL(metrics.valorContratado)}</span></td>
       <td>${statusBadge(cliente.status)}</td>
       <td><div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editCliente('${docEncoded}')"><i class="ti ti-edit"></i></button>
-        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openClienteWhatsapp('${docEncoded}')"><i class="ti ti-brand-whatsapp"></i></button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editCliente('${clienteRef}')"><i class="ti ti-edit"></i></button>
+        <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openClienteWhatsapp('${clienteRef}')"><i class="ti ti-brand-whatsapp"></i></button>
       </div></td>
     </tr>`;
   });
@@ -2162,7 +2470,13 @@ function decodeDocParam(encodedDoc) {
 
 function findClienteByDoc(doc) {
   const normalized = String(doc || '').replace(/\D/g, '');
+  if (!normalized) return null;
   return clientes.find((c) => String(c.doc || '').replace(/\D/g, '') === normalized) || null;
+}
+
+function findClienteByReference(reference) {
+  const value = decodeDocParam(reference);
+  return clientes.find((cliente) => String(cliente.id || '') === value) || findClienteByDoc(value);
 }
 
 function parseCurrencyBRL(value) {
@@ -2231,6 +2545,7 @@ function resetClienteModalMode() {
   const title = document.getElementById('modal-cliente-title');
   const btn = document.getElementById('btn-salvar-cliente');
   const editDoc = document.getElementById('cli-edit-doc');
+  const editId = document.getElementById('cli-edit-id');
   const statusInput = document.getElementById('cli-current-status');
   const toggleBtn = document.getElementById('btn-toggle-cliente-status');
 
@@ -2241,6 +2556,7 @@ function resetClienteModalMode() {
     btn.innerHTML = '<i class="ti ti-check"></i>Cadastrar';
   }
   if (editDoc) editDoc.value = '';
+  if (editId) editId.value = '';
   if (statusInput) statusInput.value = 'ativo';
   if (toggleBtn) {
     toggleBtn.style.display = 'none';
@@ -2248,9 +2564,8 @@ function resetClienteModalMode() {
   }
 }
 
-function viewCliente(encodedDoc) {
-  const doc = decodeDocParam(encodedDoc);
-  const cliente = findClienteByDoc(doc);
+function viewCliente(encodedReference) {
+  const cliente = findClienteByReference(encodedReference);
   if (!cliente) {
     showToast('Cliente não encontrado', 'warning');
     return;
@@ -2264,9 +2579,11 @@ function viewCliente(encodedDoc) {
   document.getElementById('cliente-detail-total').textContent = '—';
   document.getElementById('cliente-detail-status').innerHTML = statusBadge(cliente.status || 'ativo');
   const clienteDetailDoc = document.getElementById('cliente-detail-doc-value');
+  const clienteDetailId = document.getElementById('cliente-detail-id-value');
   const clienteDetailStatus = document.getElementById('cliente-detail-status-value');
   const clienteDetailStatusBtn = document.getElementById('btn-toggle-cliente-status-detail');
   if (clienteDetailDoc) clienteDetailDoc.value = cliente.doc || '';
+  if (clienteDetailId) clienteDetailId.value = cliente.id || '';
   if (clienteDetailStatus) clienteDetailStatus.value = cliente.status || 'ativo';
   if (clienteDetailStatusBtn) {
     clienteDetailStatusBtn.innerHTML = normalizeFilterValue(cliente.status || 'ativo') === 'ativo'
@@ -2289,9 +2606,8 @@ function viewCliente(encodedDoc) {
   openModal('modal-cliente-detalhe');
 }
 
-function editCliente(encodedDoc) {
-  const doc = decodeDocParam(encodedDoc);
-  const cliente = findClienteByDoc(doc);
+function editCliente(encodedReference) {
+  const cliente = findClienteByReference(encodedReference);
   if (!cliente) {
     showToast('Cliente não encontrado', 'warning');
     return;
@@ -2300,6 +2616,7 @@ function editCliente(encodedDoc) {
   const title = document.getElementById('modal-cliente-title');
   const btn = document.getElementById('btn-salvar-cliente');
   const editDoc = document.getElementById('cli-edit-doc');
+  const editId = document.getElementById('cli-edit-id');
   const statusInput = document.getElementById('cli-current-status');
   const toggleBtn = document.getElementById('btn-toggle-cliente-status');
   const statusAtual = normalizeFilterValue(cliente.status || 'ativo') === 'inativo' ? 'inativo' : 'ativo';
@@ -2311,6 +2628,7 @@ function editCliente(encodedDoc) {
     btn.innerHTML = '<i class="ti ti-device-floppy"></i>Salvar alterações';
   }
   if (editDoc) editDoc.value = cliente.doc || '';
+  if (editId) editId.value = cliente.id || '';
   if (statusInput) statusInput.value = statusAtual;
   if (toggleBtn) {
     toggleBtn.style.display = 'inline-flex';
@@ -2323,13 +2641,13 @@ function editCliente(encodedDoc) {
   document.getElementById('cli-tipo').value = cliente.tipo || 'CNPJ';
   document.getElementById('cli-doc').value = cliente.doc || '';
   document.getElementById('cli-tel').value = cliente.tel && cliente.tel !== '—' ? cliente.tel : '';
+  document.getElementById('cli-email').value = cliente.email || '';
 
   openModal('modal-novo-cliente');
 }
 
-function openClienteWhatsapp(encodedDoc) {
-  const doc = decodeDocParam(encodedDoc);
-  const cliente = findClienteByDoc(doc);
+function openClienteWhatsapp(encodedReference) {
+  const cliente = findClienteByReference(encodedReference);
   if (!cliente) {
     showToast('Cliente não encontrado', 'warning');
     return;

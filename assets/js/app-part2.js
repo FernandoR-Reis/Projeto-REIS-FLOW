@@ -2125,8 +2125,11 @@ function clearTenantScopedMemory() {
   window._systemConfig = null;
   window._systemConfigStorageSnapshot = null;
   window._systemConfigStorageInvalid = false;
+  window._reisCompanyProfile = null;
   window._reisPrimaryDataState = 'idle';
   window._reisPrimaryDataError = '';
+  window._reisDashboardModuleStates = {};
+  window._reisDashboardModuleUpdatedAt = {};
   equipesLastSyncSource = 'local';
   estoqueLastSyncSource = 'local';
   fornecedoresLastSyncSource = 'local';
@@ -2205,6 +2208,16 @@ function onFornecedorTelefoneInput(input) {
 function onFornecedorCnpjInput(input) {
   if (!input) return;
   input.value = formatFornecedorCnpj(input.value);
+}
+
+function onCompanyCnpjInput(input) {
+  if (!input) return;
+  input.value = formatFornecedorCnpj(input.value);
+}
+
+function onCompanyPhoneInput(input) {
+  if (!input) return;
+  input.value = formatFornecedorTelefone(input.value);
 }
 
 function normalizeFornecedor(item, index = 0) {
@@ -4460,6 +4473,14 @@ function getDashboardMetrics() {
   };
 }
 
+function getDashboardModuleState(moduleName) {
+  const moduleStates = window._reisDashboardModuleStates;
+  if (moduleStates && Object.prototype.hasOwnProperty.call(moduleStates, moduleName)) {
+    return moduleStates[moduleName];
+  }
+  return window._reisPrimaryDataState || 'loading';
+}
+
 function setDashboardMetricText(valueId, value, subId, subText) {
   const valueEl = document.getElementById(valueId);
   const subEl = subId ? document.getElementById(subId) : null;
@@ -4472,7 +4493,7 @@ function updateDashboardDeadlineAlert() {
   const titleEl = document.getElementById('dash-obras-alert-title');
   const descEl = document.getElementById('dash-obras-alert-desc');
   if (!alertEl || !titleEl || !descEl) return;
-  if (window._reisPrimaryDataState !== 'synced') {
+  if (getDashboardModuleState('obras') !== 'synced') {
     alertEl.style.display = 'none';
     return;
   }
@@ -4498,40 +4519,92 @@ function updateDashboardDeadlineAlert() {
   descEl.textContent = `${obrasList}${extra} - revise os prazos e notifique as equipes.`;
 }
 
+function updateDashboardSyncStatus() {
+  const status = document.getElementById('dash-sync-status');
+  const label = document.getElementById('dash-sync-status-label');
+  if (!status || !label) return;
+
+  const permittedStates = Object.entries(window._reisDashboardModuleStates || {})
+    .filter(([moduleName, state]) => state !== 'unavailable' && hasModulePermission(moduleName));
+  const loading = permittedStates.some(([, state]) => state === 'loading');
+  const failed = permittedStates.filter(([, state]) => state === 'error');
+  const succeeded = permittedStates.filter(([, state]) => state === 'synced');
+  const auxiliarySources = [
+    ['equipes', equipesLastSyncSource],
+    ['estoque', estoqueLastSyncSource],
+    ['fornecedores', fornecedoresLastSyncSource]
+  ].filter(([moduleName]) => hasModulePermission(moduleName));
+  const auxiliaryUnsynced = auxiliarySources.filter(([, source]) => source !== 'supabase');
+
+  let stateClass = 'is-success';
+  let message = 'Dados atualizados';
+  if (window._reisActiveAuthScope === 'local-demo') {
+    stateClass = 'is-warning';
+    message = 'Ambiente de demonstração';
+  } else if (loading) {
+    stateClass = 'is-loading';
+    message = 'Sincronizando dados';
+  } else if (permittedStates.length === 0) {
+    stateClass = 'is-warning';
+    message = 'Sem módulos operacionais autorizados';
+  } else if (failed.length > 0 || auxiliaryUnsynced.length > 0) {
+    const hasSuccessfulSource = succeeded.length > 0
+      || auxiliarySources.some(([, source]) => source === 'supabase');
+    if (hasSuccessfulSource) {
+      stateClass = 'is-warning';
+      message = failed.length > 0
+        ? `Sincronização parcial · ${failed.map(([name]) => name).join(', ')}`
+        : 'Dados principais atualizados · sincronização auxiliar pendente';
+    } else {
+      stateClass = 'is-error';
+      message = 'Não foi possível sincronizar';
+    }
+  }
+
+  status.className = `dashboard-sync-status ${stateClass}`;
+  label.textContent = message;
+}
+
 function applyDashboardMetrics() {
   const m = getDashboardMetrics();
-  const primaryState = window._reisPrimaryDataState || 'loading';
-  const dataAvailable = primaryState === 'synced';
-
-  const primaryUnavailable = primaryState !== 'synced';
-  const sourceWarning = (source, error, count) => source === 'supabase'
-    ? ''
-    : ` · ${error ? 'falha de sincronização' : count ? 'cache local não confirmado' : 'sincronização pendente'}`;
-  const teamAvailable = equipesLastSyncSource === 'supabase' || equipeData.length > 0;
-  const stockAvailable = estoqueLastSyncSource === 'supabase' || estoqueData.length > 0;
-  setDashboardMetricText('dash-obras-ativas-value', primaryUnavailable ? '—' : String(m.obrasAtivas), 'dash-obras-ativas-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.totalObras} obras cadastradas`);
-  setDashboardMetricText('dash-obras-atrasadas-value', primaryUnavailable ? '—' : String(m.obrasAtrasadas), 'dash-obras-atrasadas-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.totalObras > 0 ? Math.round((m.obrasAtrasadas / m.totalObras) * 100) : 0}% da carteira`);
-  setDashboardMetricText('dash-faturamento-mensal-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.faturamentoMensal), 'dash-faturamento-mensal-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : 'Recebimentos com baixa neste mês');
-  setDashboardMetricText('dash-lucro-previsto-value', '—', 'dash-lucro-previsto-sub', 'Custo previsto de obras não está disponível');
-  setDashboardMetricText('dash-orc-pendentes-value', primaryUnavailable ? '—' : String(m.orcPendentes), 'dash-orc-pendentes-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${formatCurrencyCompactBR(m.orcPendentesValor)} em orçamentos pendentes`);
-  setDashboardMetricText('dash-equipes-campo-value', teamAvailable ? String(m.equipesCampo) : '—', 'dash-equipes-campo-sub', `${teamAvailable ? `${m.equipesAtivas} profissionais ativos` : 'Dados não confirmados'}${sourceWarning(equipesLastSyncSource, equipesSyncError, equipeData.length)}`);
-  setDashboardMetricText('dash-contas-vencendo-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.contasVencendo), 'dash-contas-vencendo-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : 'A receber + a pagar · hoje a hoje + 7 dias');
-  setDashboardMetricText('dash-a-receber-value', primaryUnavailable ? '—' : formatCurrencyCompactBR(m.aReceber), 'dash-a-receber-sub', primaryUnavailable ? 'Dados do banco indisponíveis' : `${m.aReceberCount} lançamento(s) em aberto`);
-  setDashboardMetricText('dash-estoque-critico-value', stockAvailable ? String(m.estoqueCritico) : '—', 'dash-estoque-critico-sub', `${stockAvailable ? `${m.estoqueCritico} item(ns) abaixo do mínimo` : 'Dados não confirmados'}${sourceWarning(estoqueLastSyncSource, estoqueSyncError, estoqueData.length)}`);
+  const worksAvailable = getDashboardModuleState('obras') === 'synced';
+  const budgetsAvailable = getDashboardModuleState('orcamentos') === 'synced';
+  const financeAvailable = getDashboardModuleState('financeiro') === 'synced';
+  const primaryStates = ['obras', 'orcamentos', 'clientes', 'financeiro']
+    .map((moduleName) => getDashboardModuleState(moduleName))
+    .filter((state) => state !== 'unavailable');
+  const teamAvailable = equipesLastSyncSource === 'supabase';
+  const stockAvailable = estoqueLastSyncSource === 'supabase';
+  setDashboardMetricText('dash-obras-ativas-value', worksAvailable ? String(m.obrasAtivas) : '—', 'dash-obras-ativas-sub', worksAvailable ? `${m.totalObras} obras na carteira` : 'Dados de obras indisponíveis');
+  setDashboardMetricText('dash-obras-atrasadas-value', worksAvailable ? String(m.obrasAtrasadas) : '—', 'dash-obras-atrasadas-sub', worksAvailable ? `${m.totalObras > 0 ? Math.round((m.obrasAtrasadas / m.totalObras) * 100) : 0}% da carteira` : 'Dados de obras indisponíveis');
+  setDashboardMetricText('dash-faturamento-mensal-value', financeAvailable ? formatCurrencyValue(m.faturamentoMensal) : '—');
+  setDashboardMetricText('dash-orc-pendentes-value', budgetsAvailable ? String(m.orcPendentes) : '—', 'dash-orc-pendentes-sub', budgetsAvailable ? `${formatCurrencyValue(m.orcPendentesValor)} em aberto` : 'Dados de orçamentos indisponíveis');
+  setDashboardMetricText('dash-equipes-campo-value', teamAvailable ? String(m.equipesCampo) : '—');
+  setDashboardMetricText('dash-contas-vencendo-value', financeAvailable ? formatCurrencyValue(m.contasVencendo) : '—');
+  setDashboardMetricText('dash-a-receber-value', financeAvailable ? formatCurrencyValue(m.aReceber) : '—', 'dash-a-receber-sub', financeAvailable ? `${m.aReceberCount} lançamento(s) em aberto` : 'Dados financeiros indisponíveis');
+  setDashboardMetricText('dash-estoque-critico-value', stockAvailable ? String(m.estoqueCritico) : '—');
 
   const metaEl = document.getElementById('dash-metrics-meta');
   if (metaEl) {
-    const updated = m.updatedAt ? new Date(m.updatedAt) : null;
-    const updatedText = updated && !Number.isNaN(updated.getTime())
-      ? updated.toLocaleString('pt-BR')
+    const updatedAt = Object.entries(window._reisDashboardModuleUpdatedAt || {})
+      .filter(([moduleName]) => getDashboardModuleState(moduleName) === 'synced')
+      .map(([, value]) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((first, second) => second.getTime() - first.getTime())[0];
+    const updatedText = updatedAt
+      ? updatedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       : 'agora';
-    const count = Number(m.sourceCount || 0);
-    metaEl.textContent = `Resumo operacional | registros analisados: ${count} | atualizado em: ${updatedText}`;
+    const summary = primaryStates.includes('error')
+      ? 'Algumas fontes falharam; os indicadores afetados aparecem como indisponíveis.'
+      : `Dados carregados às ${updatedText}.`;
+    metaEl.textContent = summary;
   }
 
+  updateDashboardSyncStatus();
   updateDashboardDeadlineAlert();
   updateDashboardWorkDistribution();
   updateDashboardLists();
+  updateDashboardPriorityActions();
   buildDashChart();
 }
 
@@ -4548,10 +4621,9 @@ function openPendingClientBudgets() {
 
 function buildDashChart() {
   const chart = document.getElementById('chart-fat');
-  const labels = document.getElementById('chart-labels');
   const title = document.getElementById('chart-period-label');
   const selector = document.getElementById('dash-period');
-  if (!chart || !labels) return;
+  if (!chart) return;
 
   if (!selector?.value) initializeDashboardPeriodSelector();
   const today = ReisFlowMetrics.todayInTimeZone();
@@ -4563,28 +4635,96 @@ function buildDashChart() {
     title.textContent = `${formatMonthLabel(first)} – ${formatMonthLabel(last)}`;
   }
 
-  chart.innerHTML = '';
-  labels.innerHTML = '';
-  if (window._reisPrimaryDataState !== 'synced') {
-    chart.innerHTML = '<div class="muted" style="align-self:center;width:100%;text-align:center">Dados do banco indisponíveis</div>';
+  chart.replaceChildren();
+  if (getDashboardModuleState('financeiro') !== 'synced') {
+    const message = document.createElement('div');
+    message.className = 'dashboard-chart-empty';
+    message.textContent = getDashboardModuleState('financeiro') === 'loading'
+      ? 'Sincronizando financeiro…'
+      : 'Dados financeiros indisponíveis; verifique a sincronização do módulo.';
+    chart.appendChild(message);
     return;
   }
 
-  const totals = months.map((month) => {
-    const total = (Array.isArray(financRec) ? financRec : [])
-      .filter((item) => isFinanceQuitadoStatus(item.status) && ReisFlowMetrics.getPaidDateKey(item).slice(0, 7) === month.key)
-      .reduce((sum, item) => sum + getFinanceAmount(item), 0);
-    return { ...month, total };
-  });
-  const maxValue = Math.max(1, ...totals.map((month) => month.total));
+  const totals = ReisFlowMetrics.aggregateMonthlyPaidFlows(financRec, financPag, months);
+  const maxValue = Math.max(1, ...totals.flatMap((month) => [month.receipts, month.payments]));
+  const svgNamespace = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNamespace, 'svg');
+  svg.setAttribute('viewBox', '0 0 640 190');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const createSvgElement = (tag, attributes = {}, text = '') => {
+    const element = document.createElementNS(svgNamespace, tag);
+    Object.entries(attributes).forEach(([name, value]) => element.setAttribute(name, String(value)));
+    if (text) element.textContent = text;
+    return element;
+  };
+  const left = 54;
+  const right = 628;
+  const top = 12;
+  const bottom = 150;
+  const plotHeight = bottom - top;
+  const pointX = (index) => left + index * ((right - left) / Math.max(1, totals.length - 1));
+  const pointY = (value) => bottom - (value / maxValue) * plotHeight;
+
+  for (let tick = 0; tick <= 3; tick += 1) {
+    const value = maxValue * (tick / 3);
+    const y = pointY(value);
+    svg.appendChild(createSvgElement('line', {
+      x1: left,
+      x2: right,
+      y1: y,
+      y2: y,
+      class: 'dashboard-chart-gridline'
+    }));
+    svg.appendChild(createSvgElement('text', {
+      x: left - 8,
+      y: y + 3,
+      class: 'dashboard-chart-axis',
+      'text-anchor': 'end'
+    }, formatCurrencyCompactBR(value)));
+  }
+
   totals.forEach((month, index) => {
-    const pct = month.total === 0 ? 0 : Math.max(3, Math.round((month.total / maxValue) * 100));
-    const isLast = index === totals.length - 1;
     const date = new Date(Date.UTC(month.year, month.month, 1));
-    const label = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' }).format(date).replace('.', '');
-    chart.innerHTML += `<div style="flex:1;border-radius:3px 3px 0 0;height:${pct}%;background:${isLast ? 'var(--petrol-light)' : 'rgba(33,118,163,0.35)'};transition:opacity 0.15s;position:relative" title="${label}: ${formatCurrencyValue(month.total)}"></div>`;
-    labels.innerHTML += `<span>${label}</span>`;
+    const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
+      .format(date)
+      .replace('.', '');
+    svg.appendChild(createSvgElement('text', {
+      x: pointX(index),
+      y: 174,
+      class: 'dashboard-chart-axis',
+      'text-anchor': 'middle'
+    }, monthLabel));
   });
+
+  [
+    { key: 'receipts', className: 'dashboard-chart-line-receipts', label: 'Recebimentos' },
+    { key: 'payments', className: 'dashboard-chart-line-payments', label: 'Pagamentos' }
+  ].forEach((series) => {
+    const points = totals.map((month, index) => `${pointX(index)},${pointY(month[series.key])}`).join(' ');
+    svg.appendChild(createSvgElement('polyline', {
+      points,
+      class: series.className,
+      fill: 'none',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round'
+    }));
+    totals.forEach((month, index) => {
+      const circle = createSvgElement('circle', {
+        cx: pointX(index),
+        cy: pointY(month[series.key]),
+        r: 3,
+        class: `${series.className}-point`
+      });
+      const tooltip = document.createElementNS(svgNamespace, 'title');
+      tooltip.textContent = `${series.label} · ${formatMonthLabel(month)}: ${formatCurrencyValue(month[series.key])}`;
+      circle.appendChild(tooltip);
+      svg.appendChild(circle);
+    });
+  });
+  chart.appendChild(svg);
 }
 
 function formatMonthLabel(month) {
@@ -4592,6 +4732,16 @@ function formatMonthLabel(month) {
   return new Intl.DateTimeFormat('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
     .format(date)
     .replace('.', '');
+}
+
+function formatDashboardShortDate(value) {
+  const dateKey = ReisFlowMetrics.toDateKey(value);
+  if (!dateKey) return 'data não informada';
+  return new Date(`${dateKey}T00:00:00Z`).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC'
+  }).replace('.', '');
 }
 
 function initializeDashboardPeriodSelector() {
@@ -4614,8 +4764,11 @@ function onDashboardPeriodChange() {
 function updateDashboardWorkDistribution() {
   const container = document.getElementById('dash-obras-status');
   if (!container) return;
-  if (window._reisPrimaryDataState !== 'synced') {
-    container.innerHTML = '<div class="muted">Dados do banco indisponíveis.</div>';
+  const totalLabel = document.getElementById('dash-work-total');
+  if (getDashboardModuleState('obras') !== 'synced') {
+    const state = getDashboardModuleState('obras');
+    if (totalLabel) totalLabel.textContent = state === 'loading' ? 'carregando' : 'dados indisponíveis';
+    container.textContent = state === 'loading' ? 'Carregando distribuição de obras…' : 'Não foi possível confirmar os dados de obras.';
     return;
   }
 
@@ -4627,45 +4780,203 @@ function updateDashboardWorkDistribution() {
     { key: 'concluida', label: 'Concluídas', color: 'var(--green)' },
     { key: 'atrasada', label: 'Atrasadas', color: 'var(--red)' }
   ];
-  const total = obras.length;
-  container.innerHTML = groups.map((group) => {
-    const count = obras.filter((work) => ReisFlowMetrics.normalizeStatus(work.status) === group.key).length;
-    const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-    return `<div>
-      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>${group.label} (${count})</span><span style="color:${group.color}">${percentage}%</span></div>
-      <div class="progress"><div class="progress-fill" style="width:${percentage}%;background:${group.color}"></div></div>
-    </div>`;
-  }).join('');
+  const distribution = ReisFlowMetrics.aggregateWorkStatusCounts(obras, groups.map((group) => group.key));
+  if (totalLabel) totalLabel.textContent = `${distribution.total} ${distribution.total === 1 ? 'obra' : 'obras'}`;
+  const visibleGroups = groups
+    .map((group) => ({ ...group, count: distribution.counts[group.key] }))
+    .filter((group) => group.count > 0);
+  if (distribution.other > 0) {
+    visibleGroups.push({ key: 'outros', label: 'Outros status', color: 'var(--gray)', count: distribution.other });
+  }
+  if (visibleGroups.length === 0) {
+    container.textContent = 'Ainda não há obras cadastradas.';
+    return;
+  }
+  container.replaceChildren();
+  visibleGroups.forEach((group) => {
+    const percentage = Math.round((group.count / distribution.total) * 100);
+    const row = document.createElement('div');
+    row.className = 'dashboard-status-row';
+    const heading = document.createElement('div');
+    heading.className = 'dashboard-status-heading';
+    const label = document.createElement('span');
+    label.textContent = group.label;
+    const value = document.createElement('span');
+    value.style.color = group.color;
+    value.textContent = `${group.count} · ${percentage}%`;
+    heading.append(label, value);
+    const track = document.createElement('div');
+    track.className = 'dashboard-status-track';
+    const fill = document.createElement('div');
+    fill.className = 'dashboard-status-fill';
+    fill.style.width = `${percentage}%`;
+    fill.style.background = group.color;
+    track.appendChild(fill);
+    row.append(heading, track);
+    container.appendChild(row);
+  });
+}
+
+function updateDashboardPriorityActions() {
+  const container = document.getElementById('dash-priority-actions');
+  const countBadge = document.getElementById('dash-action-count');
+  if (!container) return;
+
+  const actions = [];
+  if (getDashboardModuleState('obras') === 'synced') {
+    obras.filter((work) => normalizeDashboardStatus(work?.status) === 'atrasada')
+      .slice(0, 2)
+      .forEach((work) => actions.push({
+        priority: 0,
+        label: 'Obra atrasada',
+        title: work.name || work.code || 'Obra sem identificação',
+        detail: `${work.code || 'Sem código'}${work.client ? ` · ${work.client}` : ''}`,
+        action: () => openObraDetail(work.code)
+      }));
+  }
+
+  if (getDashboardModuleState('orcamentos') === 'synced') {
+    orcamentos.filter((budget) => normalizeDashboardStatus(budget?.status) === 'pendente')
+      .slice(0, 2)
+      .forEach((budget) => actions.push({
+        priority: 1,
+        label: 'Aguardando resposta',
+        title: budget.client || budget.code || 'Orçamento pendente',
+        detail: `${budget.code || 'Orçamento'} · ${budget.valor || formatCurrencyValue(budget.valorNumerico || 0)}`,
+        action: () => {
+          const statusFilter = document.getElementById('orc-filter-status');
+          if (statusFilter) statusFilter.value = 'pendente';
+          navigate('orcamentos', null);
+          if (typeof applyOrcamentosFilters === 'function') applyOrcamentosFilters();
+        }
+      }));
+  }
+
+  if (getDashboardModuleState('financeiro') === 'synced') {
+    const today = ReisFlowMetrics.todayInTimeZone();
+    [
+      ...financRec.map((item) => ({ ...item, dashboardFlowType: 'Receber' })),
+      ...financPag.map((item) => ({ ...item, dashboardFlowType: 'Pagar' }))
+    ]
+      .filter((item) => {
+        const temporalState = ReisFlowMetrics.getTemporalState(item, today);
+        return temporalState === 'vencido' || temporalState === 'vence_hoje' || (
+          temporalState === 'a_vencer' && ReisFlowMetrics.isDueWithinDays(item, today, 7)
+        );
+      })
+      .sort((first, second) => {
+        const firstDate = ReisFlowMetrics.toDateKey(first.vencimento || first.venc);
+        const secondDate = ReisFlowMetrics.toDateKey(second.vencimento || second.venc);
+        return firstDate.localeCompare(secondDate);
+      })
+      .slice(0, 3)
+      .forEach((item) => {
+        const temporalState = ReisFlowMetrics.getTemporalState(item, today);
+        const dueLabel = temporalState === 'vencido'
+          ? 'Vencido'
+          : temporalState === 'vence_hoje'
+            ? 'Vence hoje'
+            : `Vence ${formatDashboardShortDate(item.vencimento || item.venc)}`;
+        actions.push({
+          priority: temporalState === 'vencido' ? 0 : 2,
+          label: `${item.dashboardFlowType} · ${dueLabel}`,
+          title: item.client || item.forn || item.ref || 'Conta financeira',
+          detail: `${item.ref || item.desc || 'Lançamento'} · ${formatCurrencyValue(item.valorNumerico || item.valor)}`,
+          action: () => navigate('financeiro', null)
+        });
+      });
+  }
+
+  const criticalStockCount = getCriticalStockCount();
+  if (hasModulePermission('estoque') && estoqueLastSyncSource === 'supabase' && criticalStockCount > 0) {
+    const criticalItem = estoqueData.find((item) => parseEstoqueNumber(item?.qtd) < parseEstoqueNumber(item?.min));
+    actions.push({
+      priority: 3,
+      label: 'Estoque abaixo do mínimo',
+      title: criticalItem?.name || 'Itens críticos de estoque',
+      detail: `${criticalStockCount} item(ns) precisam de reposição`,
+      action: () => navigate('estoque', null)
+    });
+  }
+
+  actions.sort((first, second) => first.priority - second.priority);
+  const shownActions = actions.slice(0, 4);
+  if (countBadge) countBadge.textContent = String(shownActions.length);
+  container.replaceChildren();
+  if (shownActions.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'dashboard-actions-empty';
+    const hasOperationalPermission = ['obras', 'orcamentos', 'financeiro']
+      .some((moduleName) => hasModulePermission(moduleName));
+    const sourcesUnavailable = ['obras', 'orcamentos', 'financeiro']
+      .some((moduleName) => getDashboardModuleState(moduleName) !== 'synced' && hasModulePermission(moduleName));
+    empty.textContent = !hasOperationalPermission
+      ? 'Seu perfil não tem acesso às fontes de pendências.'
+      : sourcesUnavailable
+        ? 'Não foi possível verificar as pendências de todos os módulos.'
+        : 'Nenhuma ação prioritária no momento.';
+    container.appendChild(empty);
+    return;
+  }
+
+  shownActions.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'dashboard-action-item';
+    button.addEventListener('click', item.action);
+    const dot = document.createElement('span');
+    dot.className = `dashboard-action-dot priority-${Math.min(item.priority, 3)}`;
+    const content = document.createElement('span');
+    content.className = 'dashboard-action-content';
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    const detail = document.createElement('span');
+    detail.textContent = item.detail;
+    const label = document.createElement('span');
+    label.className = `dashboard-action-label priority-${Math.min(item.priority, 3)}`;
+    label.textContent = item.label;
+    content.append(title, detail);
+    button.append(dot, content, label);
+    container.appendChild(button);
+  });
+}
+
+function getCriticalStockCount() {
+  return estoqueData.filter((item) => parseEstoqueNumber(item?.qtd) < parseEstoqueNumber(item?.min)).length;
 }
 
 function updateDashboardLists() {
   const worksContainer = document.getElementById('dash-recent-works');
   const clientsBody = document.getElementById('dash-recent-clients');
-  const state = window._reisPrimaryDataState;
   if (worksContainer) {
     worksContainer.innerHTML = '';
-    if (state !== 'synced') {
-      worksContainer.textContent = state === 'error' ? 'Dados indisponíveis; a lista anterior pode estar desatualizada.' : 'Aguardando sincronização.';
+    if (getDashboardModuleState('obras') !== 'synced') {
+      worksContainer.textContent = getDashboardModuleState('obras') === 'loading'
+        ? 'Aguardando sincronização.'
+        : 'Dados de obras indisponíveis; verifique a sincronização.';
     } else if (obras.length === 0) {
       worksContainer.textContent = 'Nenhuma obra cadastrada.';
     } else {
       obras.slice(0, 3).forEach((work) => {
-        const card = document.createElement('div');
-        card.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer';
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'dashboard-recent-item';
         card.addEventListener('click', () => openObraDetail(work.code));
+        const marker = document.createElement('span');
+        marker.className = 'dashboard-recent-marker';
+        marker.innerHTML = '<i class="ti ti-building-factory-2" aria-hidden="true"></i>';
         const details = document.createElement('div');
-        details.style.cssText = 'flex:1;min-width:0';
-        const name = document.createElement('div');
-        name.className = 'bold';
-        name.textContent = work.name || 'Obra sem nome';
+        details.className = 'dashboard-recent-content';
+        const nameLabel = document.createElement('strong');
+        nameLabel.textContent = work.name || 'Obra sem nome';
         const meta = document.createElement('div');
-        meta.className = 'muted';
-        meta.style.fontSize = '11px';
-        meta.textContent = `${work.code || 'Sem código'} · Prazo: ${work.prazo || 'não informado'}`;
+        meta.textContent = [work.code || 'Sem código', work.client && work.client !== '—' ? work.client : '', `Prazo: ${work.prazo || 'não informado'}`]
+          .filter(Boolean)
+          .join(' · ');
         const status = document.createElement('span');
         status.innerHTML = statusBadge(work.status);
-        details.append(name, meta);
-        card.append(details, status);
+        details.append(nameLabel, meta);
+        card.append(marker, details, status);
         worksContainer.append(card);
       });
     }
@@ -4673,12 +4984,14 @@ function updateDashboardLists() {
 
   if (clientsBody) {
     clientsBody.innerHTML = '';
-    if (state !== 'synced') {
+    if (getDashboardModuleState('clientes') !== 'synced') {
       const row = clientsBody.insertRow();
       const cell = row.insertCell();
       cell.colSpan = 5;
       cell.className = 'muted';
-      cell.textContent = state === 'error' ? 'Dados indisponíveis; a lista anterior pode estar desatualizada.' : 'Aguardando sincronização.';
+      cell.textContent = getDashboardModuleState('clientes') === 'loading'
+        ? 'Aguardando sincronização.'
+        : 'Dados de clientes indisponíveis; verifique a sincronização.';
     } else if (clientes.length === 0) {
       const row = clientsBody.insertRow();
       const cell = row.insertCell();
@@ -5505,7 +5818,7 @@ function showNotifPanel() {
 
 function clearViewRenderCache(view) {
   const clearIds = {
-    dashboard: ['chart-fat', 'chart-labels'],
+    dashboard: ['chart-fat'],
     obras: ['obras-tbody', 'obras-kanban'],
     orcamentos: ['orc-tbody', 'orc-preview-items'],
     clientes: ['cli-tbody'],
@@ -5816,6 +6129,11 @@ async function goToApp(nome, cargo = 'operador') {
     return;
   }
   navigate(initialView, null);
+  if (typeof loadCompanyProfile === 'function') {
+    loadCompanyProfile().catch((error) => {
+      console.error('Falha ao carregar os dados cadastrais da empresa para o breadcrumb.', error);
+    });
+  }
   buildDashChart();
   if (window._permissionRefreshTimer) clearInterval(window._permissionRefreshTimer);
   window._permissionRefreshTimer = setInterval(async () => {
@@ -5841,6 +6159,7 @@ async function goToApp(nome, cargo = 'operador') {
   Promise.resolve(typeof loadAllData === 'function' ? loadAllData() : null)
     .then(syncAuthorizedOperationalData)
     .then(() => {
+      updateDashboardOperationalStats();
       updateFornecedoresSummary();
       populateFornecedorDatalist();
       if (window._currentView === 'fornecedores') {
