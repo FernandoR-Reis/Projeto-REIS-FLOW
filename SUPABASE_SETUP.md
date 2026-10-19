@@ -32,6 +32,14 @@ Para publicar no projeto Supabase ja vinculado ao CLI, confira primeiro
 Revise as migrations pendentes e entao aplique-as com
 `supabase db push --linked`.
 
+A migration `20261019000117_fix_insert_tenant_assignment.sql` alinha o
+preenchimento automatico de `empresa_id` ao vinculo ativo em
+`tenant_memberships`, usado pelas politicas RLS. Perfis legados com empresa
+diferente ou vazia nao devem definir o tenant dos novos registros. A correcao
+nao reatribui registros existentes nem altera as permissoes de acesso.
+O teste `supabase/tests/insert_tenant_assignment.sql` cobre esse fluxo com
+fixtures sinteticas e rollback, somente em banco isolado de teste.
+
 O `schema.sql` e somente a estrutura-base e bloqueia o acesso autenticado ate as
 migrations de isolamento serem instaladas. Nao publique chaves nem libere login
 entre a aplicacao do schema e a ultima migration.
